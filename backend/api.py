@@ -53,12 +53,35 @@ class RankResponse(BaseModel):
 # 数据库连接管理
 @contextmanager
 def get_db():
-    conn = sqlite3.connect('scores.db')
-    conn.row_factory = sqlite3.Row
+    print(f"🔍 [DEBUG] get_db 尝试连接数据库: scores.db")
+    print(f"🔍 [DEBUG] get_db 当前工作目录: {os.getcwd()}")
+    print(f"🔍 [DEBUG] get_db 数据库文件存在: {os.path.exists('scores.db')}")
+    
+    # 尝试不同的数据库路径
+    db_paths = ['scores.db', '/app/backend/scores.db', './scores.db']
+    db_path = None
+    
+    for path in db_paths:
+        if os.path.exists(path):
+            db_path = path
+            print(f"🔍 [DEBUG] get_db 找到数据库文件: {path}")
+            break
+    
+    if not db_path:
+        print(f"❌ [DEBUG] get_db 未找到数据库文件，检查过的路径: {db_paths}")
+        raise FileNotFoundError("数据库文件未找到")
+    
     try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        print(f"🔍 [DEBUG] get_db 数据库连接成功: {db_path}")
         yield conn
+    except Exception as e:
+        print(f"❌ [DEBUG] get_db 数据库连接失败: {e}")
+        raise
     finally:
         conn.close()
+        print(f"🔍 [DEBUG] get_db 数据库连接已关闭")
 
 # 这些函数已经从 rank_calculator 模块导入，不再需要在这里定义
 
@@ -116,6 +139,18 @@ async def query_rank(query: ScoreQuery):
     
     - **score**: 中考分数（0-800分，支持0.1分精度）
     """
+    print(f"🔍 [DEBUG] 收到查询请求: score={query.score}")
+    print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
+    print(f"🔍 [DEBUG] 目录内容: {os.listdir('.')}")
+    
+    # 检查数据库文件存在性
+    db_paths_to_check = ['scores.db', '/app/backend/scores.db', './scores.db']
+    for db_path in db_paths_to_check:
+        exists = os.path.exists(db_path)
+        print(f"🔍 [DEBUG] 数据库路径 {db_path}: {'存在' if exists else '不存在'}")
+        if exists:
+            print(f"🔍 [DEBUG] 文件大小: {os.path.getsize(db_path)} bytes")
+    
     try:
         # 验证分数精度（支持0.01分）
         if round(query.score * 100) != query.score * 100:
@@ -124,8 +159,12 @@ async def query_rank(query: ScoreQuery):
                 detail="分数仅支持保留两位小数（如750.25、750.50）"
             )
         
+        print(f"🔍 [DEBUG] 开始调用 calculate_enhanced_rank...")
+        
         # 使用增强版的计算函数
         rank_result = calculate_enhanced_rank(query.score, year=2024, db_path='scores.db')
+        
+        print(f"🔍 [DEBUG] 计算结果: {rank_result}")
         
         if rank_result['total_students'] == 0:
             raise HTTPException(
@@ -135,6 +174,8 @@ async def query_rank(query: ScoreQuery):
         
         # 生成详细分析
         analysis = get_detailed_analysis(rank_result)
+        
+        print(f"🔍 [DEBUG] 分析完成，准备返回结果")
         
         return RankResponse(
             score=query.score,
@@ -147,6 +188,10 @@ async def query_rank(query: ScoreQuery):
         )
         
     except Exception as e:
+        print(f"❌ [DEBUG] 查询失败: {str(e)}")
+        print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")
+        import traceback
+        print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"查询失败：{str(e)}"
@@ -155,8 +200,19 @@ async def query_rank(query: ScoreQuery):
 @app.get("/stats")
 async def get_statistics():
     """获取2024年市六区统计信息"""
+    print(f"🔍 [DEBUG] /stats 请求开始")
+    print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
+    
+    # 检查数据库文件
+    db_paths_to_check = ['scores.db', '/app/backend/scores.db']
+    for db_path in db_paths_to_check:
+        exists = os.path.exists(db_path)
+        print(f"🔍 [DEBUG] /stats 数据库路径 {db_path}: {'存在' if exists else '不存在'}")
+    
     try:
+        print(f"🔍 [DEBUG] 准备连接数据库...")
         with get_db() as conn:
+            print(f"🔍 [DEBUG] 数据库连接成功")
             cursor = conn.cursor()
             
             # 获取最高分、最低分、总人数
@@ -169,6 +225,7 @@ async def get_statistics():
                 WHERE year = 2024
             """)
             result = cursor.fetchone()
+            print(f"🔍 [DEBUG] 基础统计查询完成: {dict(result)}")
             
             # 获取各分数段人数
             cursor.execute("""
@@ -192,8 +249,9 @@ async def get_statistics():
                 {"range": row[0], "count": row[1]} 
                 for row in cursor.fetchall()
             ]
+            print(f"🔍 [DEBUG] 分数分布查询完成: {score_distribution}")
             
-            return {
+            response_data = {
                 "year": 2024,
                 "region": "天津市六区",
                 "max_score": result['max_score'],
@@ -201,8 +259,14 @@ async def get_statistics():
                 "total_students": result['total_students'],
                 "score_distribution": score_distribution
             }
+            print(f"🔍 [DEBUG] /stats 响应数据准备完成")
+            return response_data
             
     except Exception as e:
+        print(f"❌ [DEBUG] /stats 错误: {str(e)}")
+        print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")
+        import traceback
+        print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"获取统计信息失败：{str(e)}"

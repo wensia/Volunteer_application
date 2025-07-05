@@ -12,12 +12,28 @@ from contextlib import contextmanager
 @contextmanager
 def get_db_connection(db_path: str = 'scores.db'):
     """数据库连接上下文管理器"""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    print(f"🔍 [DEBUG] get_db_connection 尝试连接: {db_path}")
+    
+    import os
+    if not os.path.exists(db_path):
+        print(f"❌ [DEBUG] 数据库文件不存在: {db_path}")
+        print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
+        print(f"🔍 [DEBUG] 目录内容: {os.listdir('.')}")
+        raise FileNotFoundError(f"数据库文件不存在: {db_path}")
+    
+    print(f"🔍 [DEBUG] 数据库文件存在，大小: {os.path.getsize(db_path)} bytes")
+    
     try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        print(f"🔍 [DEBUG] 数据库连接成功: {db_path}")
         yield conn
+    except Exception as e:
+        print(f"❌ [DEBUG] 数据库连接失败: {e}")
+        raise
     finally:
         conn.close()
+        print(f"🔍 [DEBUG] 数据库连接已关闭")
 
 
 class ImprovedRankCalculator:
@@ -33,9 +49,12 @@ class ImprovedRankCalculator:
     
     def _load_data(self):
         """从数据库加载数据"""
+        print(f"🔍 [DEBUG] _load_data 开始加载数据，年份: {self.year}, 数据库: {self.db_path}")
+        
         with get_db_connection(self.db_path) as conn:
             cursor = conn.cursor()
             
+            print(f"🔍 [DEBUG] 执行SQL查询...")
             # 获取所有分数数据
             cursor.execute("""
                 SELECT score, inner_six
@@ -45,7 +64,10 @@ class ImprovedRankCalculator:
             """, (self.year,))
             
             data = cursor.fetchall()
+            print(f"🔍 [DEBUG] 查询结果: {len(data)} 条记录")
+            
             if not data:
+                print(f"❌ [DEBUG] 数据库中没有{self.year}年的数据")
                 raise ValueError(f"数据库中没有{self.year}年的数据")
             
             # 构建分数到排名的映射
@@ -60,6 +82,12 @@ class ImprovedRankCalculator:
             
             # 总人数是最大的累计值
             self.total_students = max(row['inner_six'] for row in data)
+            
+            print(f"🔍 [DEBUG] 数据加载完成:")
+            print(f"🔍 [DEBUG] - 总记录数: {len(data)}")
+            print(f"🔍 [DEBUG] - 最高分: {max(self.sorted_scores)}")
+            print(f"🔍 [DEBUG] - 最低分: {min(self.sorted_scores)}")
+            print(f"🔍 [DEBUG] - 总学生数: {self.total_students}")
     
     def _linear_interpolate(self, score: float) -> int:
         """
@@ -223,8 +251,38 @@ class ImprovedRankCalculator:
 # 兼容原有接口
 def calculate_enhanced_rank(score: float, year: int = 2024, db_path: str = 'scores.db') -> Dict[str, any]:
     """计算增强版的市六区排名位次（兼容接口）"""
-    calculator = ImprovedRankCalculator(year, db_path)
-    return calculator.calculate_rank(score)
+    print(f"🔍 [DEBUG] calculate_enhanced_rank 开始")
+    print(f"🔍 [DEBUG] 参数: score={score}, year={year}, db_path={db_path}")
+    
+    import os
+    print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
+    print(f"🔍 [DEBUG] 数据库文件存在: {os.path.exists(db_path)}")
+    
+    # 尝试不同路径
+    db_paths_to_try = [db_path, '/app/backend/scores.db', './scores.db']
+    actual_db_path = db_path
+    for path in db_paths_to_try:
+        if os.path.exists(path):
+            print(f"🔍 [DEBUG] 找到数据库文件: {path}")
+            actual_db_path = path
+            break
+    else:
+        print(f"❌ [DEBUG] 未找到数据库文件，尝试过的路径: {db_paths_to_try}")
+        raise FileNotFoundError(f"数据库文件未找到")
+    
+    try:
+        print(f"🔍 [DEBUG] 创建 ImprovedRankCalculator 实例...")
+        calculator = ImprovedRankCalculator(year, actual_db_path)
+        print(f"🔍 [DEBUG] Calculator 创建成功，总学生数: {calculator.total_students}")
+        
+        result = calculator.calculate_rank(score)
+        print(f"🔍 [DEBUG] 计算完成: {result}")
+        return result
+    except Exception as e:
+        print(f"❌ [DEBUG] calculate_enhanced_rank 失败: {e}")
+        import traceback
+        print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
+        raise
 
 
 def get_detailed_analysis(result: Dict[str, any]) -> str:
