@@ -1,0 +1,291 @@
+# 现代化Web应用设计规范 - 基于天津中考志愿填报助手
+
+## 设计理念
+复用基于Shadcn/ui + Tailwind CSS的现代化设计系统，融合玻璃态效果和渐变设计。
+
+## 技术栈规范
+
+### 前端框架
+- **CSS框架**: Tailwind CSS
+- **设计系统**: Shadcn/ui 设计规范
+- **字体**: Inter字体系列
+- **图标**: 优先使用SVG图标或简洁的几何图形
+
+### 设计风格
+
+#### 色彩系统
+```css
+/* 主色调 */
+--primary: hsl(222.2 47.4% 11.2%)
+--primary-foreground: hsl(210 40% 98%)
+
+/* 渐变色彩 */
+--primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+--secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)
+--background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)
+
+/* 文本颜色 */
+--text-primary: #1e293b
+--text-secondary: #64748b
+--text-muted: #94a3b8
+
+/* 边框和背景 */
+--border: hsl(214.3 31.8% 91.4%)
+--background: hsl(0 0% 100%)
+--muted: hsl(210 40% 96%)
+```
+
+#### 玻璃态效果
+```css
+/* 玻璃态背景 */
+--glass-bg: rgba(255, 255, 255, 0.1)
+--glass-border: rgba(255, 255, 255, 0.2)
+--glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37)
+
+/* 应用方式 */
+background: var(--glass-bg);
+backdrop-filter: blur(20px);
+border: 1px solid var(--glass-border);
+box-shadow: var(--glass-shadow);
+```
+
+## 组件设计规范
+
+### 卡片设计
+```html
+<div class="card">
+  <div class="card-header">
+    <h3 class="text-lg font-semibold text-slate-900">标题</h3>
+    <p class="text-sm text-slate-600">描述文字</p>
+  </div>
+  <div class="card-content">
+    <!-- 内容区域 -->
+  </div>
+</div>
+```
+
+### 按钮设计
+```html
+<!-- 主按钮 -->
+<button class="btn-primary">
+  操作按钮
+</button>
+
+<!-- 次要按钮 -->
+<button class="btn-secondary">
+  次要操作
+</button>
+
+<!-- 轮廓按钮 -->
+<button class="btn-outline">
+  轮廓按钮
+</button>
+```
+
+### 表单输入
+```html
+<div class="space-y-2">
+  <label class="text-sm font-medium text-slate-900">
+    标签文字
+  </label>
+  <input type="text" class="form-input" placeholder="占位文字">
+</div>
+```
+
+### 数据展示
+```html
+<!-- 统计数字展示 -->
+<div class="text-center">
+  <div class="text-3xl font-bold text-slate-900">{{ 数据 }}</div>
+  <div class="text-sm text-slate-600">描述标签</div>
+</div>
+
+<!-- 网格布局统计 -->
+<div class="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200">
+  <div class="text-center">
+    <div class="text-lg font-semibold text-slate-900">{{ 数据1 }}</div>
+    <div class="text-xs text-slate-600">标签1</div>
+  </div>
+  <!-- 重复其他统计项 -->
+</div>
+```
+
+## 布局规范
+
+### 容器布局
+```html
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <!-- 页面内容 -->
+</div>
+```
+
+### 导航栏
+```html
+<header class="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur">
+  <div class="container flex h-14 items-center justify-between">
+    <div class="flex items-center space-x-6">
+      <a href="/" class="flex items-center space-x-2">
+        <span class="text-lg font-semibold">品牌名称</span>
+      </a>
+    </div>
+    <nav class="flex items-center space-x-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-slate-700 text-slate-600">
+        导航项
+      </a>
+    </nav>
+  </div>
+</header>
+```
+
+### 页脚
+```html
+<footer class="border-t border-slate-200">
+  <div class="container py-8">
+    <div class="text-center text-sm text-slate-500">
+      <p>© 2024 应用名称</p>
+    </div>
+  </div>
+</footer>
+```
+
+## 交互效果
+
+### 悬停效果
+```css
+/* 卡片悬停 */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮悬停 */
+.btn-primary:hover {
+  background-color: hsl(222.2 47.4% 20%);
+  transform: translateY(-1px);
+}
+```
+
+### 动画效果
+```css
+/* 渐入动画 */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 过渡效果 */
+.transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+```
+
+## 响应式设计
+
+### 断点规范
+- **移动端**: < 768px
+- **平板**: 768px - 1024px  
+- **桌面**: > 1024px
+
+### 响应式样式
+```css
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .card-content {
+    padding: 1.5rem 1.25rem;
+  }
+  
+  .text-3xl {
+    font-size: 2rem;
+  }
+}
+```
+
+## 状态指示
+
+### 加载状态
+```html
+<button class="btn-primary" disabled>
+  <span class="hidden">加载中...</span>
+  <span>操作按钮</span>
+</button>
+```
+
+### 错误提示
+```html
+<div class="rounded-lg border border-red-200 bg-red-50 p-4">
+  <div class="flex">
+    <div class="ml-3">
+      <h3 class="text-sm font-medium text-red-800">错误</h3>
+      <div class="mt-2 text-sm text-red-700">
+        错误信息内容
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### 成功提示
+```html
+<div class="rounded-lg border border-green-200 bg-green-50 p-4">
+  <div class="flex">
+    <div class="ml-3">
+      <h3 class="text-sm font-medium text-green-800">成功</h3>
+      <div class="mt-2 text-sm text-green-700">
+        成功信息内容
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+## 代码规范
+
+### HTML结构
+- 使用语义化HTML标签
+- 合理的层级结构和缩进
+- 必要的辅助功能属性
+
+### CSS类命名
+- 优先使用Tailwind CSS工具类
+- 自定义类使用BEM命名规范
+- 保持一致的命名风格
+
+### JavaScript
+- 使用现代ES6+语法
+- 优雅的错误处理
+- 适当的注释说明
+
+## 性能优化
+
+### 图片优化
+- 使用WebP格式
+- 适当的图片尺寸
+- 懒加载实现
+
+### CSS优化
+- 合理使用Tailwind CSS purge
+- 避免不必要的重复样式
+- 使用CSS变量提高维护性
+
+### 用户体验
+- 快速的页面加载
+- 流畅的交互动画
+- 清晰的反馈机制
+
+## 使用指南
+
+1. **开始新项目时**，复制base.html的头部配置
+2. **创建页面时**，使用规范的容器和卡片结构
+3. **添加交互时**，参考既有的按钮和表单样式
+4. **响应式设计**，优先移动端体验
+5. **测试阶段**，确保在不同设备上的一致性
+
+这套设计规范旨在创建统一、现代、用户友好的Web应用界面。 

@@ -1,0 +1,171 @@
+# AI代码生成规则 - 现代化设计风格
+
+## 核心原则
+始终生成符合Shadcn/ui + Tailwind CSS设计系统的现代化界面代码。
+
+## 必用技术栈
+- **前端**: Tailwind CSS + Shadcn/ui 设计规范
+- **字体**: Inter字体系列
+- **响应式**: 移动端优先
+
+## 样式模板
+
+### 页面容器
+```html
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <!-- 内容 -->
+</div>
+```
+
+### 卡片组件
+```html
+<div class="card">
+  <div class="card-header">
+    <h3 class="text-lg font-semibold text-slate-900">标题</h3>
+    <p class="text-sm text-slate-600">描述</p>
+  </div>
+  <div class="card-content">
+    <!-- 内容 -->
+  </div>
+</div>
+```
+
+### 按钮样式
+```html
+<button class="btn-primary">主要操作</button>
+<button class="btn-secondary">次要操作</button>
+<button class="btn-outline">轮廓按钮</button>
+```
+
+### 表单输入
+```html
+<div class="space-y-2">
+  <label class="text-sm font-medium text-slate-900">标签</label>
+  <input type="text" class="form-input" placeholder="占位文字">
+</div>
+```
+
+### 数据展示
+```html
+<!-- 大数字展示 -->
+<div class="text-center">
+  <div class="text-3xl font-bold text-slate-900">{{ 数据 }}</div>
+  <div class="text-sm text-slate-600">描述</div>
+</div>
+
+<!-- 统计网格 -->
+<div class="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200">
+  <div class="text-center">
+    <div class="text-lg font-semibold text-slate-900">{{ 数据 }}</div>
+    <div class="text-xs text-slate-600">标签</div>
+  </div>
+</div>
+```
+
+### 导航栏
+```html
+<header class="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur">
+  <div class="container flex h-14 items-center justify-between">
+    <span class="text-lg font-semibold">品牌名</span>
+    <nav class="flex items-center space-x-6">
+      <a href="#" class="text-sm font-medium text-slate-600 hover:text-slate-700">导航</a>
+    </nav>
+  </div>
+</header>
+```
+
+### 状态提示
+```html
+<!-- 错误 -->
+<div class="rounded-lg border border-red-200 bg-red-50 p-4">
+  <h3 class="text-sm font-medium text-red-800">错误</h3>
+  <p class="text-sm text-red-700">错误信息</p>
+</div>
+
+<!-- 成功 -->
+<div class="rounded-lg border border-green-200 bg-green-50 p-4">
+  <h3 class="text-sm font-medium text-green-800">成功</h3>
+  <p class="text-sm text-green-700">成功信息</p>
+</div>
+```
+
+## CSS类规范
+
+### 必备基础类
+- `container mx-auto px-4 py-8` - 页面容器
+- `max-w-4xl` - 最大宽度限制
+- `space-y-4` - 垂直间距
+- `flex items-center justify-between` - 弹性布局
+- `grid grid-cols-3 gap-4` - 网格布局
+- `text-center` - 文本居中
+- `rounded-lg border p-4` - 圆角边框内边距
+
+### 文字样式
+- `text-3xl font-bold text-slate-900` - 大标题
+- `text-lg font-semibold text-slate-900` - 中标题
+- `text-sm font-medium text-slate-900` - 小标题
+- `text-sm text-slate-600` - 描述文字
+- `text-xs text-slate-600` - 小号文字
+
+### 颜色系统
+- 主要文字: `text-slate-900`
+- 次要文字: `text-slate-600` 
+- 弱化文字: `text-slate-500`
+- 边框色: `border-slate-200`
+- 背景色: `bg-slate-50`
+
+## 代码生成规则
+
+1. **始终使用响应式设计**，优先移动端
+2. **必须包含完整的HTML结构**，包括必要的容器
+3. **使用语义化标签**，如header、main、section等
+4. **添加适当的过渡效果**，使用`transition-colors`等
+5. **保持一致的间距**，使用space-y、gap等工具类
+6. **确保可访问性**，添加必要的aria属性和label
+7. **优先使用工具类**，避免自定义CSS
+8. **保持简洁清晰**，避免过度复杂的嵌套
+
+## 生成示例
+
+当用户要求创建页面/组件时，按以下结构生成：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>页面标题</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* 添加必要的自定义样式 */
+    </style>
+</head>
+<body class="min-h-full bg-white text-slate-900">
+    <!-- 导航栏 -->
+    <header class="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur">
+        <!-- 导航内容 -->
+    </header>
+    
+    <!-- 主要内容 -->
+    <main class="flex-1">
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <!-- 页面内容 -->
+        </div>
+    </main>
+    
+    <!-- 页脚（可选） -->
+    <footer class="border-t border-slate-200">
+        <div class="container py-8">
+            <div class="text-center text-sm text-slate-500">
+                <p>© 2024 应用名称</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
+```
+
+遵循以上规则，确保生成的代码具有现代化、一致性和可维护性。 

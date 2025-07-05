@@ -1,0 +1,40 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Test files
+test_*.py
+*_test.py
+pytest.ini
+
+# Documentation
+*.md
+docs/
+
+# GitHub
+.github/
+
+# Misc
+.DS_Store
+*.swp
+*.swo
+*~
+EOF < /dev/null

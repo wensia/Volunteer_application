@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天津中考位次查询系统</title>
+    <!-- 本地静态资源 -->
+    <link rel="stylesheet" href="static/css/app.css">
+    <script src="static/js/react.production.min.js"></script>
+    <script src="static/js/react-dom.production.min.js"></script>
+    <script src="static/js/babel-standalone.min.js"></script>
+    <script src="static/js/axios.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+        
+        // 配置
+        const CONFIG = {
+            API_BASE_URL: '',
+            MIN_SCORE: 0,
+            MAX_SCORE: 800,
+            SCORE_PRECISION: 0.01,  // 支持两位小数
+            DEBOUNCE_DELAY: 300,
+            CACHE_TTL: 5 * 60 * 1000, // 5分钟
+        };
+        
+        // 工具函数
+        const utils = {
+            // 验证分数
+            validateScore: (score) => {
+                const num = parseFloat(score);
+                if (isNaN(num)) return { valid: false, error: '请输入有效的数字' };
+                if (num < CONFIG.MIN_SCORE || num > CONFIG.MAX_SCORE) {
+                    return { valid: false, error: `分数必须在${CONFIG.MIN_SCORE}-${CONFIG.MAX_SCORE}之间` };
+                }
+                if (Math.round(num * 100) !== num * 100) {
+                    return { valid: false, error: `分数仅支持保留两位小数（如750.25、750.50）` };
+                }
+                return { valid: true, value: num };
+            },
+            
+            // 格式化数字
+            formatNumber: (num) => {
+                return new Intl.NumberFormat('zh-CN').format(num);
+            },
+            
+            // 防抖函数
+            debounce: (func, delay) => {
+                let timeoutId;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => func(...args), delay);
+                };
+            },
+            
+            // 获取分数段建议
+            getScoreRangeAdvice: (rank, total) => {
+                const percentage = (rank / total) * 100;
+                const ranges = [
+                    { max: 1, label: '顶尖', color: 'text-purple-600', icon: '🏆' },
+                    { max: 5, label: '优秀', color: 'text-blue-600', icon: '⭐' },
+                    { max: 10, label: '良好', color: 'text-green-600', icon: '✨' },
+                    { max: 20, label: '中上', color: 'text-yellow-600', icon: '💪' },
+                    { max: 50, label: '中等', color: 'text-orange-600', icon: '📚' },
+                    { max: 100, label: '一般', color: 'text-gray-600', icon: '💡' },
+                ];
+                
+                for (const range of ranges) {
+                    if (percentage <= range.max) {
+                        return range;
+                    }
+                }
+                return ranges[ranges.length - 1];
+            }
+        };
+        
+        // API服务
+        class ApiService {
+            constructor() {
+                this.cache = new Map();
+                this.axios = axios.create({
+                    baseURL: CONFIG.API_BASE_URL,
+                    timeout: 10000,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+            }
+            
+            // 查询排名
+            async queryRank(score, year = null) {
+                const cacheKey = `rank_${score}_${year || 'default'}`;
+                
+                // 检查缓存
+                const cached = this.cache.get(cacheKey);
+                if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_TTL) {
+                    return cached.data;
+                }
+                
+                try {
+                    const response = await this.axios.post('/rank', { score, year });
+                    const data = response.data;
+                    
+                    // 缓存结果
+                    this.cache.set(cacheKey, {
+                        data,
+                        timestamp: Date.now()
+                    });
+                    
+                    return data;
+                } catch (error) {
+                    if (error.response) {
+                        throw new Error(error.response.data.detail || '查询失败');
+                    } else if (error.request) {
+                        throw new Error('网络错误，请检查连接');
+                    } else {
+                        throw new Error('请求失败');
+                    }
+                }
+            }
+            
+            // 获取统计信息
+            async getStatistics(year = null) {
+                const cacheKey = `stats_${year || 'default'}`;
+                const cached = this.cache.get(cacheKey);
+                
+                if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_TTL) {
+                    return cached.data;
+                }
+                
+                const response = await this.axios.get('/stats', { params: { year } });
+                const data = response.data;
+                
+                this.cache.set(cacheKey, {
+                    data,
+                    timestamp: Date.now()
+                });
+                
+                return data;
+            }
+            
+            // 清除缓存
+            clearCache() {
+                this.cache.clear();
+            }
+        }
+        
+        // 创建API实例
+        const api = new ApiService();
+        
+        // 组件：输入框
+        const ScoreInput = ({ value, onChange, onSubmit, disabled }) => {
+            const inputRef = useRef(null);
+            
+            useEffect(() => {
+                inputRef.current?.focus();
+            }, []);
+            
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !disabled) {
+                    onSubmit();
+                }
+            };
+            
+            return (
+                <div className="relative">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        inputMode="decimal"
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        disabled={disabled}
+                        placeholder="请输入分数（如750.25）"
+                        className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg 
+                                 focus:outline-none focus:ring-2 focus:ring-black focus:border-black 
+                                 disabled:bg-gray-100 disabled:cursor-not-allowed
+                                 transition-all duration-200"
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <span className="text-gray-400 text-sm">分</span>
+                    </div>
+                </div>
+            );
+        };
+        
+        // 组件：查询按钮
+        const QueryButton = ({ onClick, loading, disabled }) => {
+            return (
+                <button
+                    onClick={onClick}
+                    disabled={disabled || loading}
+                    className="w-full sm:w-auto px-6 py-2 bg-black text-white rounded-lg 
+                             hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 
+                             focus:ring-black disabled:bg-gray-400 disabled:cursor-not-allowed 
+                             transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                    {loading ? (
+                        <>
+                            <div className="loader"></div>
+                            <span>查询中...</span>
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span>查询位次</span>
+                        </>
+                    )}
+                </button>
+            );
+        };
+        
+        // 组件：结果展示
+        const ResultDisplay = ({ result }) => {
+            const advice = utils.getScoreRangeAdvice(result.rank, result.total_students);
+            
+            return (
+                <div className="animate-fadeIn space-y-6">
+                    {/* 主要结果 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold">查询结果</h3>
+                            <span className={`text-2xl ${advice.color}`}>{advice.icon}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <div className="text-3xl font-bold text-gray-900">
+                                    {utils.formatNumber(result.rank)}
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">市六区排名</div>
+                            </div>
+                            
+                            <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <div className="text-3xl font-bold text-gray-900">
+                                    {result.percentage.toFixed(1)}%
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">超过考生</div>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-600">总人数</span>
+                                <span className="font-medium">{utils.formatNumber(result.total_students)}人</span>
+                            </div>
+                            {result.rank_range && (
+                                <div className="flex items-center justify-between text-sm mt-2">
+                                    <span className="text-gray-600">该分数排名区间</span>
+                                    <span className="font-medium">
+                                        第{utils.formatNumber(result.rank_range.start)}-{utils.formatNumber(result.rank_range.end)}名
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between text-sm mt-2">
+                                <span className="text-gray-600">当前分数段人数</span>
+                                <span className="font-medium">{utils.formatNumber(result.segment_count || 0)}人</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm mt-2">
+                                <span className="text-gray-600">成绩水平</span>
+                                <span className={`font-medium ${advice.color}`}>{advice.label}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        
+        // 主应用组件
+        const App = () => {
+            const [score, setScore] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [error, setError] = useState('');
+            
+            
+            // 处理查询
+            const handleQuery = useCallback(async () => {
+                const validation = utils.validateScore(score);
+                
+                if (!validation.valid) {
+                    setError(validation.error);
+                    return;
+                }
+                
+                setError('');
+                setLoading(true);
+                setResult(null);
+                
+                try {
+                    const data = await api.queryRank(validation.value);
+                    setResult(data);
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            }, [score]);
+            
+            // 处理输入变化
+            const handleScoreChange = useCallback((value) => {
+                setScore(value);
+                setError('');
+                
+                // 实时验证
+                if (value && !utils.validateScore(value).valid) {
+                    const debouncedValidation = utils.debounce(() => {
+                        const validation = utils.validateScore(value);
+                        if (!validation.valid) {
+                            setError(validation.error);
+                        }
+                    }, CONFIG.DEBOUNCE_DELAY);
+                    debouncedValidation();
+                }
+            }, []);
+            
+            return (
+                <div className="min-h-screen bg-gray-50 py-8">
+                    <div className="max-w-2xl mx-auto px-4">
+                        {/* 头部 */}
+                        <header className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                                天津中考位次查询系统
+                            </h1>
+                            <p className="text-gray-600">
+                                2024年天津市六区中考成绩位次查询
+                            </p>
+                        </header>
+                        
+                        {/* 查询表单 */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        中考分数
+                                    </label>
+                                    <ScoreInput
+                                        value={score}
+                                        onChange={handleScoreChange}
+                                        onSubmit={handleQuery}
+                                        disabled={loading}
+                                    />
+                                    {error && (
+                                        <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" 
+                                                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" 
+                                                      clipRule="evenodd" />
+                                            </svg>
+                                            {error}
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                <div className="flex justify-center">
+                                    <QueryButton
+                                        onClick={handleQuery}
+                                        loading={loading}
+                                        disabled={!score || !!error}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* 查询结果 */}
+                        {result && <ResultDisplay result={result} />}
+                        
+                        
+                        {/* 页脚 */}
+                        <footer className="text-center text-sm text-gray-500 mt-8">
+                            <p>数据仅供参考，实际录取以官方公布为准</p>
+                        </footer>
+                    </div>
+                </div>
+            );
+        };
+        
+        // 渲染应用
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

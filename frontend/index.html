@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天津中考位次查询系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* shadcn/ui 风格的自定义样式 */
+        .input {
+            flex: 1 1 auto;
+            width: 100%;
+            height: 2.5rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: rgb(15 23 42);
+            background-color: transparent;
+            border: 1px solid rgb(226 232 240);
+            border-radius: 0.375rem;
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+        
+        .input:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            border-color: rgb(15 23 42);
+        }
+        
+        .input:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .input::placeholder {
+            color: rgb(148 163 184);
+        }
+        
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+            height: 2.5rem;
+            padding: 0.5rem 1rem;
+        }
+        
+        .button:focus-visible {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 2px rgb(255 255 255), 0 0 0 4px rgb(15 23 42);
+        }
+        
+        .button:disabled {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        
+        .button-primary {
+            background-color: rgb(15 23 42);
+            color: rgb(248 250 252);
+        }
+        
+        .button-primary:hover {
+            background-color: rgb(15 23 42 / 0.9);
+        }
+        
+        .card {
+            border-radius: 0.5rem;
+            border: 1px solid rgb(226 232 240);
+            background-color: rgb(255 255 255);
+            color: rgb(15 23 42);
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+        
+        .alert {
+            position: relative;
+            width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .alert-error {
+            border-color: rgb(254 226 226);
+            background-color: rgb(254 242 242);
+            color: rgb(153 27 27);
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // API基础URL（根据实际部署修改）
+        const API_BASE_URL = 'http://localhost:8008';
+
+        // Loading 图标组件
+        const LoadingIcon = () => (
+            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        );
+
+        // Check 图标组件
+        const CheckIcon = () => (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+        );
+
+        // Alert 图标组件
+        const AlertIcon = () => (
+            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+            </svg>
+        );
+
+        // 主应用组件
+        const App = () => {
+            const [score, setScore] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [result, setResult] = useState(null);
+            const [stats, setStats] = useState(null);
+            const inputRef = useRef(null);
+
+            // 获取统计信息
+            useEffect(() => {
+                fetch(`${API_BASE_URL}/stats`)
+                    .then(res => res.json())
+                    .then(data => setStats(data))
+                    .catch(err => console.error('获取统计信息失败:', err));
+            }, []);
+
+            // 处理输入变化
+            const handleInputChange = (e) => {
+                const value = e.target.value;
+                // 只允许数字和小数点
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setScore(value);
+                    setError('');
+                }
+            };
+
+            // 处理表单提交
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setResult(null);
+
+                const scoreNum = parseFloat(score);
+
+                // 客户端验证
+                if (!score || isNaN(scoreNum)) {
+                    setError('请输入有效的分数');
+                    inputRef.current?.focus();
+                    return;
+                }
+
+                if (scoreNum < 0 || scoreNum > 800) {
+                    setError('请输入0-800之间的分数');
+                    inputRef.current?.focus();
+                    return;
+                }
+
+                if (Math.round(scoreNum * 100) !== scoreNum * 100) {
+                    setError('分数仅支持保留两位小数（如750.25、750.50）');
+                    inputRef.current?.focus();
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    // 调用API
+                    const response = await fetch(`${API_BASE_URL}/rank`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ score: scoreNum })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || '查询失败');
+                    }
+
+                    const data = await response.json();
+                    setResult(data);
+                } catch (err) {
+                    setError(err.message || '查询失败，请稍后重试');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-white">
+                    {/* 导航栏 */}
+                    <nav className="border-b">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between h-16">
+                                <div className="flex items-center">
+                                    <h1 className="text-xl font-semibold">天津中考位次查询（市六区）</h1>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* 主体内容 */}
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <div className="max-w-lg mx-auto">
+                            {/* 查询卡片 */}
+                            <div className="card">
+                                <div className="p-6">
+                                    <div className="text-center mb-6">
+                                        <h2 className="text-lg font-semibold">中考成绩位次查询</h2>
+                                        <p className="mt-1 text-sm text-slate-500">输入您的中考总分，查询市六区排名</p>
+                                    </div>
+
+                                    <form onSubmit={handleSubmit} className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label htmlFor="score" className="text-sm font-medium">
+                                                中考总分
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    ref={inputRef}
+                                                    id="score"
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    value={score}
+                                                    onChange={handleInputChange}
+                                                    placeholder="请输入分数"
+                                                    className={`input pr-12 ${error ? 'border-red-500 focus:border-red-500' : ''}`}
+                                                    disabled={loading}
+                                                />
+                                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                                    <span className="text-slate-500 text-sm">分</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-500">满分 800 分，支持 0.1 分精度</p>
+                                        </div>
+
+                                        {error && (
+                                            <div className="alert alert-error">
+                                                <div className="flex items-center gap-2">
+                                                    <AlertIcon />
+                                                    <span>{error}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            type="submit"
+                                            disabled={loading}
+                                            className="button button-primary w-full"
+                                        >
+                                            {loading ? (
+                                                <>
+                                                    <LoadingIcon />
+                                                    <span className="ml-2">查询中...</span>
+                                                </>
+                                            ) : (
+                                                '查询位次'
+                                            )}
+                                        </button>
+                                    </form>
+
+                                    {/* 查询结果 */}
+                                    {result && (
+                                        <div className="mt-6 space-y-4">
+                                            <div className="rounded-lg bg-slate-50 p-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="bg-white rounded-md p-3 border border-slate-200">
+                                                        <p className="text-xs font-medium text-slate-500">您的分数</p>
+                                                        <p className="text-lg font-semibold mt-1">{result.score} 分</p>
+                                                    </div>
+                                                    <div className="bg-white rounded-md p-3 border border-slate-200">
+                                                        <p className="text-xs font-medium text-slate-500">市六区位次</p>
+                                                        <p className="text-lg font-semibold mt-1">第 {result.rank.toLocaleString()} 名</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 统计信息 */}
+                            {stats && (
+                                <div className="mt-6 card p-4">
+                                    <h3 className="text-sm font-medium mb-3">2024年市六区数据统计</h3>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">最高分</span>
+                                            <span className="font-medium">{stats.max_score} 分</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">最低分</span>
+                                            <span className="font-medium">{stats.min_score} 分</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">总人数</span>
+                                            <span className="font-medium">{stats.total_students?.toLocaleString()} 人</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 使用提示 */}
+                            <div className="mt-6 card p-4">
+                                <h3 className="text-sm font-medium mb-3">使用提示</h3>
+                                <ul className="space-y-2 text-sm text-slate-600">
+                                    <li className="flex items-start">
+                                        <CheckIcon />
+                                        <span className="ml-1.5">仅计算天津市六区（市内六区）位次</span>
+                                    </li>
+                                    <li className="flex items-start">
+                                        <CheckIcon />
+                                        <span className="ml-1.5">数据基于2024年中考成绩</span>
+                                    </li>
+                                    <li className="flex items-start">
+                                        <CheckIcon />
+                                        <span className="ml-1.5">查询结果仅供参考</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* 页脚 */}
+                    <footer className="mt-12 py-6 text-center text-xs text-slate-400 border-t">
+                        <p>© 2024 天津中考位次查询系统 | 数据仅供参考</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        // 渲染应用
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
