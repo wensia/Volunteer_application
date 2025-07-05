@@ -1,5 +1,32 @@
 /* 基础Tailwind CSS样式 - 预编译版本 */
 
+/* 移动端优化样式 */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  -khtml-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* 防止移动端输入框缩放 */
+input[type="text"], input[type="number"], input[type="email"], input[type="tel"] {
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
 /* Reset和基础样式 */
 *, ::before, ::after {
   box-sizing: border-box;

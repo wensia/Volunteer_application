@@ -2,20 +2,48 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>天津中考位次查询系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="api_compatibility_fix.js"></script>
     <style>
+        /* 移动端优化样式 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        input, textarea {
+            -webkit-user-select: text;
+            -khtml-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        
+        /* 防止移动端输入框缩放 */
+        input[type="text"], input[type="number"], input[type="email"], input[type="tel"] {
+            font-size: 16px !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        
         /* shadcn/ui 风格的自定义样式 */
         .input {
             flex: 1 1 auto;
             width: 100%;
             height: 2.5rem;
             padding: 0.5rem 0.75rem;
-            font-size: 0.875rem;
+            font-size: 16px !important; /* 防止移动端缩放 */
             line-height: 1.25rem;
             color: rgb(15 23 42);
             background-color: transparent;
@@ -115,8 +143,8 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        // API基础URL（根据实际部署修改）
-        const API_BASE_URL = 'http://localhost:8008';
+        // 使用增强的API客户端
+        const apiClient = window.apiClient;
 
         // Loading 图标组件
         const LoadingIcon = () => (
@@ -151,8 +179,7 @@
 
             // 获取统计信息
             useEffect(() => {
-                fetch(`${API_BASE_URL}/stats`)
-                    .then(res => res.json())
+                apiClient.getStats()
                     .then(data => setStats(data))
                     .catch(err => console.error('获取统计信息失败:', err));
             }, []);
@@ -197,24 +224,12 @@
                 setLoading(true);
 
                 try {
-                    // 调用API
-                    const response = await fetch(`${API_BASE_URL}/rank`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ score: scoreNum })
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || '查询失败');
-                    }
-
-                    const data = await response.json();
+                    // 使用增强的API客户端
+                    const data = await apiClient.queryRank(scoreNum);
                     setResult(data);
-                } catch (err) {
-                    setError(err.message || '查询失败，请稍后重试');
+                } catch (error) {
+                    console.error('API调用错误:', error);
+                    setError(error.message || '查询失败，请稍后重试');
                 } finally {
                     setLoading(false);
                 }

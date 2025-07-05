@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>天津中考位次查询系统</title>
     <!-- 本地静态资源 -->
     <link rel="stylesheet" href="static/css/app.css">
@@ -176,6 +176,7 @@
                         onKeyPress={handleKeyPress}
                         disabled={disabled}
                         placeholder="请输入分数（如750.25）"
+                        style={{fontSize: '16px'}}
                         className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg 
                                  focus:outline-none focus:ring-2 focus:ring-black focus:border-black 
                                  disabled:bg-gray-100 disabled:cursor-not-allowed
