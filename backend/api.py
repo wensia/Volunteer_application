@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# 确保当前目录在Python路径中
+current_dir = Path(__file__).parent.absolute()
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
@@ -6,7 +15,6 @@ from pydantic import BaseModel, Field
 import sqlite3
 from typing import Optional
 from contextlib import contextmanager
-from pathlib import Path
 from rank_calculator import calculate_enhanced_rank, get_detailed_analysis
 
 app = FastAPI(

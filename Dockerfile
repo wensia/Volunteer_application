@@ -43,6 +43,7 @@ COPY --chown=appuser:appuser frontend/ ./frontend/
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="/app/backend" \
     PORT=8008
 
 # 切换到非root用户
