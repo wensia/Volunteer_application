@@ -48,6 +48,9 @@ ENV PYTHONUNBUFFERED=1 \
 # 切换到非root用户
 USER appuser
 
+# 切换到backend目录
+WORKDIR /app/backend
+
 # 暴露端口
 EXPOSE 8008
 
@@ -55,5 +58,5 @@ EXPOSE 8008
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8008/api-info || exit 1
 
-# 启动命令
-CMD ["python", "-m", "uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8008"]
+# 启动命令（现在工作目录是/app/backend，可以直接运行api.py）
+CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8008"]
