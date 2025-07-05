@@ -41,11 +41,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 # 复制应用代码
 COPY --chown=appuser:appuser backend/ ./backend/
 COPY --chown=appuser:appuser frontend/ ./frontend/
+COPY --chown=appuser:appuser container_check.sh ./container_check.sh
 
 # 验证数据库文件并设置权限
 RUN ls -la ./backend/scores.db && \
     file ./backend/scores.db && \
     sqlite3 ./backend/scores.db "SELECT COUNT(*) FROM score_records LIMIT 1;" && \
+    chmod +x ./container_check.sh && \
     echo "✅ 数据库验证成功"
 
 # 设置环境变量
