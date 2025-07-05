@@ -24,6 +24,8 @@ FROM python:3.11-slim
 # 安装运行时依赖
 RUN apt-get update && apt-get install -y \
     curl \
+    sqlite3 \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非root用户
@@ -39,6 +41,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 # 复制应用代码
 COPY --chown=appuser:appuser backend/ ./backend/
 COPY --chown=appuser:appuser frontend/ ./frontend/
+
+# 验证数据库文件并设置权限
+RUN ls -la ./backend/scores.db && \
+    file ./backend/scores.db && \
+    sqlite3 ./backend/scores.db "SELECT COUNT(*) FROM score_records LIMIT 1;" && \
+    echo "✅ 数据库验证成功"
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
