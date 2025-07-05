@@ -7,7 +7,7 @@ import sqlite3
 from typing import Optional
 from contextlib import contextmanager
 from pathlib import Path
-from rank_calculator import calculate_enhanced_rank, get_detailed_analysis
+from .rank_calculator import calculate_enhanced_rank, get_detailed_analysis
 
 app = FastAPI(
     title="天津中考位次查询API",
@@ -45,7 +45,9 @@ class RankResponse(BaseModel):
 # 数据库连接管理
 @contextmanager
 def get_db():
-    conn = sqlite3.connect('scores.db')
+    # 在Docker容器中，数据库文件位于backend目录
+    db_path = Path(__file__).parent / 'scores.db'
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -117,7 +119,8 @@ async def query_rank(query: ScoreQuery):
             )
         
         # 使用增强版的计算函数
-        rank_result = calculate_enhanced_rank(query.score, year=2024)
+        db_path = Path(__file__).parent / 'scores.db'
+        rank_result = calculate_enhanced_rank(query.score, year=2024, db_path=str(db_path))
         
         if rank_result['total_students'] == 0:
             raise HTTPException(
