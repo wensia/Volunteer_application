@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>API兼容性测试页面</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            background: #f9fafb;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-family: monospace;
+        }
+        .success { background: #d1fae5; color: #065f46; }
+        .error { background: #fee2e2; color: #991b1b; }
+        .info { background: #dbeafe; color: #1e40af; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 4px;
+        }
+        button:hover { background: #2563eb; }
+        input {
+            font-size: 16px !important;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 API兼容性测试页面</h1>
+    
+    <div class="card">
+        <h2>📱 移动端测试</h2>
+        <p>在移动设备上测试输入框，确认页面不会缩放：</p>
+        <input type="text" placeholder="点击这里测试输入框" id="testInput">
+        <div id="inputTest" class="status info">请在移动设备上点击输入框，页面应该不会缩放</div>
+    </div>
+
+    <div class="card">
+        <h2>🌐 API连接测试</h2>
+        <p>测试API端点连接和响应：</p>
+        <button onclick="testAPIConnection()">测试API连接</button>
+        <button onclick="testScoreQuery()">测试分数查询</button>
+        <button onclick="showAPIStatus()">显示API状态</button>
+        <div id="apiTest" class="status info">点击按钮开始测试...</div>
+    </div>
+
+    <div class="card">
+        <h2>📊 实时状态</h2>
+        <div id="statusDisplay" class="status info">API状态加载中...</div>
+    </div>
+
+    <script>
+        // 基础API配置
+        const API_CONFIG = {
+            endpoints: [
+                '',
+                'http://localhost:8008',
+                window.location.origin,
+            ],
+            timeout: 10000,
+            retryCount: 3,
+            retryDelay: 1000,
+        };
+
+        // 简化的API客户端
+        class SimpleApiClient {
+            constructor() {
+                this.baseURL = '';
+                this.initialized = false;
+            }
+
+            async initialize() {
+                if (this.initialized) return;
+                
+                for (const endpoint of API_CONFIG.endpoints) {
+                    try {
+                        const testUrl = endpoint || window.location.origin;
+                        const response = await fetch(testUrl + '/api-info', {
+                            method: 'GET',
+                            timeout: 5000
+                        });
+                        
+                        if (response.ok) {
+                            this.baseURL = endpoint;
+                            this.initialized = true;
+                            return true;
+                        }
+                    } catch (error) {
+                        console.log(`端点测试失败: ${endpoint}`, error);
+                    }
+                }
+                
+                this.baseURL = '';
+                this.initialized = true;
+                return false;
+            }
+
+            buildURL(path) {
+                return (this.baseURL || '') + (path.startsWith('/') ? path : '/' + path);
+            }
+
+            async testConnection() {
+                await this.initialize();
+                
+                try {
+                    const response = await fetch(this.buildURL('/api-info'));
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        return { success: false, error: `HTTP ${response.status}` };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async queryScore(score) {
+                await this.initialize();
+                
+                try {
+                    const response = await fetch(this.buildURL('/rank'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ score })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        return { success: false, error: `HTTP ${response.status}` };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+        }
+
+        const apiClient = new SimpleApiClient();
+
+        // 测试函数
+        async function testAPIConnection() {
+            const testDiv = document.getElementById('apiTest');
+            testDiv.className = 'status info';
+            testDiv.textContent = '🔍 正在测试API连接...';
+
+            const result = await apiClient.testConnection();
+            
+            if (result.success) {
+                testDiv.className = 'status success';
+                testDiv.textContent = `✅ API连接成功！版本: ${result.data.version}`;
+            } else {
+                testDiv.className = 'status error';
+                testDiv.textContent = `❌ API连接失败: ${result.error}`;
+            }
+        }
+
+        async function testScoreQuery() {
+            const testDiv = document.getElementById('apiTest');
+            testDiv.className = 'status info';
+            testDiv.textContent = '🔍 正在测试分数查询 (750分)...';
+
+            const result = await apiClient.queryScore(750);
+            
+            if (result.success) {
+                testDiv.className = 'status success';
+                testDiv.textContent = `✅ 查询成功！750分位次: ${result.data.rank}`;
+            } else {
+                testDiv.className = 'status error';
+                testDiv.textContent = `❌ 查询失败: ${result.error}`;
+            }
+        }
+
+        function showAPIStatus() {
+            const testDiv = document.getElementById('apiTest');
+            testDiv.className = 'status info';
+            testDiv.innerHTML = `
+                📊 API状态信息:<br>
+                - 基础URL: ${apiClient.baseURL || '相对路径'}<br>
+                - 初始化状态: ${apiClient.initialized ? '✅ 已初始化' : '❌ 未初始化'}<br>
+                - 网络状态: ${navigator.onLine ? '✅ 在线' : '❌ 离线'}<br>
+                - 当前域名: ${window.location.origin}
+            `;
+        }
+
+        // 页面加载时自动显示状态
+        window.addEventListener('load', () => {
+            // 显示初始状态
+            setTimeout(showAPIStatus, 1000);
+            
+            // 监听输入框焦点
+            const testInput = document.getElementById('testInput');
+            const inputTestDiv = document.getElementById('inputTest');
+            
+            testInput.addEventListener('focus', () => {
+                inputTestDiv.className = 'status success';
+                inputTestDiv.textContent = '✅ 输入框获得焦点，检查页面是否保持原有比例';
+            });
+            
+            testInput.addEventListener('blur', () => {
+                inputTestDiv.className = 'status info';
+                inputTestDiv.textContent = '📱 输入框测试完成，如果页面没有缩放则表示修复成功';
+            });
+        });
+
+        // 定期更新状态
+        setInterval(() => {
+            const statusDiv = document.getElementById('statusDisplay');
+            statusDiv.innerHTML = `
+                🕐 ${new Date().toLocaleTimeString()}<br>
+                📱 设备类型: ${/Mobi|Android/i.test(navigator.userAgent) ? '移动设备' : '桌面设备'}<br>
+                🌐 用户代理: ${navigator.userAgent.substring(0, 50)}...<br>
+                📊 视口大小: ${window.innerWidth} x ${window.innerHeight}
+            `;
+        }, 5000);
+    </script>
+</body>
+</html> 
