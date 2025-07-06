@@ -494,8 +494,8 @@
             // 处理输入变化
             const handleInputChange = (e) => {
                 const value = e.target.value;
-                // 只允许数字和小数点
-                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                // 只允许数字和小数点，限制最多两位小数
+                if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
                     setScore(value);
                     setError('');
                 }
@@ -579,7 +579,7 @@
                                                     inputMode="decimal"
                                                     value={score}
                                                     onChange={handleInputChange}
-                                                    placeholder="请输入分数"
+                                                    placeholder="如：650 或 650.25"
                                                     className={`input pr-12 ${error ? 'border-red-500 focus:border-red-500' : ''}`}
                                                     disabled={loading}
                                                 />
@@ -587,7 +587,7 @@
                                                     <span className="text-slate-500 text-sm">分</span>
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-slate-500">满分 800 分，支持 0.1 分精度</p>
+                                            <p className="text-xs text-slate-500">满分 800 分，支持 0.01 分精度（如 760.25、650.50）</p>
                                         </div>
 
                                         {error && (
