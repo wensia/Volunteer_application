@@ -36,7 +36,10 @@
                 if (num < CONFIG.MIN_SCORE || num > CONFIG.MAX_SCORE) {
                     return { valid: false, error: `分数必须在${CONFIG.MIN_SCORE}-${CONFIG.MAX_SCORE}之间` };
                 }
-                if (Math.round(num * 100) !== num * 100) {
+                // 验证小数位数（修复浮点数精度问题）
+                const scoreStr = score.toString();
+                const decimalIndex = scoreStr.indexOf('.');
+                if (decimalIndex !== -1 && scoreStr.length - decimalIndex - 1 > 2) {
                     return { valid: false, error: `分数仅支持保留两位小数（如750.25、750.50）` };
                 }
                 return { valid: true, value: num };

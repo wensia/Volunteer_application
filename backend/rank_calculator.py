@@ -161,8 +161,10 @@ class ImprovedRankCalculator:
         if not 0 <= score <= 800:
             raise ValueError(f"分数必须在0-800之间，当前输入：{score}")
         
-        # 验证精度（支持0.01分）
-        if not np.isclose(score * 100, np.round(score * 100)):
+        # 验证精度（支持0.01分，修复浮点数精度问题）
+        score_str = str(score)
+        decimal_index = score_str.find('.')
+        if decimal_index != -1 and len(score_str) - decimal_index - 1 > 2:
             raise ValueError(f"分数仅支持保留两位小数，当前输入：{score}")
         
         # 计算全市排名

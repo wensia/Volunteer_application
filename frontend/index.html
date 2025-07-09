@@ -164,6 +164,17 @@
                 throw lastError;
             }
             
+            // 获取存储的API密钥
+            getApiKey() {
+                // 优先从URL参数获取，其次从localStorage获取
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlKey = urlParams.get('api_key') || '';
+                if (urlKey) {
+                    return urlKey;
+                }
+                return localStorage.getItem('tj_exam_api_key') || '';
+            }
+            
             // 查询排名
             async queryRank(score, year = null) {
                 await this.initialize();
@@ -183,10 +194,18 @@
                 const url = this.buildURL('/rank');
                 const body = JSON.stringify({ score, year });
                 
+                // 获取API密钥
+                const apiKey = this.getApiKey();
+                
                 try {
                     const response = await this.requestWithRetry(url, {
                         method: 'POST',
-                        body: body
+                        body: body,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-API-Key': apiKey
+                        }
                     });
                     
                     const data = await response.json();
@@ -452,6 +471,13 @@
 
         // 使用增强的API客户端
         const apiClient = window.apiClient;
+        
+        // 从URL参数获取API密钥
+        const getApiKeyFromUrl = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('api_key') || '';
+        };
+
 
         // Loading 图标组件
         const LoadingIcon = () => (
@@ -475,6 +501,7 @@
             </svg>
         );
 
+
         // 主应用组件
         const App = () => {
             const [score, setScore] = useState('');
@@ -482,10 +509,17 @@
             const [error, setError] = useState('');
             const [result, setResult] = useState(null);
             const [stats, setStats] = useState(null);
+            const [apiKey, setApiKey] = useState('');
             const inputRef = useRef(null);
 
-            // 获取统计信息
+            // 初始化
             useEffect(() => {
+                // 从URL或localStorage获取API密钥
+                const urlKey = getApiKeyFromUrl();
+                const savedKey = urlKey || localStorage.getItem('tj_exam_api_key') || '';
+                setApiKey(savedKey);
+                
+                // 获取统计信息
                 apiClient.getStats()
                     .then(data => setStats(data))
                     .catch(err => console.error('获取统计信息失败:', err));
@@ -522,7 +556,10 @@
                     return;
                 }
 
-                if (Math.round(scoreNum * 100) !== scoreNum * 100) {
+                // 验证小数位数（修复浮点数精度问题）
+                const scoreStr = score.toString();
+                const decimalIndex = scoreStr.indexOf('.');
+                if (decimalIndex !== -1 && scoreStr.length - decimalIndex - 1 > 2) {
                     setError('分数仅支持保留两位小数（如750.25、750.50）');
                     inputRef.current?.focus();
                     return;
@@ -550,6 +587,11 @@
                             <div className="flex justify-between h-16">
                                 <div className="flex items-center">
                                     <h1 className="text-xl font-semibold">天津中考位次查询（全市/市六区）</h1>
+                                </div>
+                                <div className="flex items-center">
+                                    <a href="/recommend-app" className="text-sm text-blue-600 hover:text-blue-800">
+                                        志愿推荐 →
+                                    </a>
                                 </div>
                             </div>
                         </div>

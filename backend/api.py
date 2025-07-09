@@ -1,5 +1,6 @@
 import sys
 import os
+import random
 from pathlib import Path
 
 # 确保当前目录在Python路径中
@@ -7,7 +8,7 @@ current_dir = Path(__file__).parent.absolute()
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +16,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from rank_calculator import calculate_enhanced_rank, get_detailed_analysis
 from data import get_year_stats, get_score_distribution
+from school_recommender import recommend_schools_by_rank
+from api_auth import verify_api_key_with_delay, blur_rank_data, blur_score_data, should_blur_data, API_KEY_INFO
 
 app = FastAPI(
     title="天津中考位次查询API",
@@ -88,6 +91,20 @@ async def serve_app():
     else:
         raise HTTPException(status_code=404, detail="前端文件未找到")
 
+@app.get("/recommend-app", response_class=HTMLResponse,
+         summary="志愿推荐界面",
+         description="天津中考志愿推荐（冲稳保）Web界面",
+         tags=["前端页面"])
+async def serve_recommend_app():
+    """提供志愿推荐界面"""
+    html_file = FRONTEND_PATH / "recommend.html"
+    if html_file.exists():
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    else:
+        raise HTTPException(status_code=404, detail="推荐页面文件未找到")
+
 @app.get("/api-info")
 async def api_info():
     """API信息（原来的根路由）"""
@@ -97,20 +114,36 @@ async def api_info():
         "endpoints": {
             "/": "查询界面",
             "/rank": "查询位次API",
+            "/recommend": "志愿推荐API",
             "/stats": "统计信息API",
             "/docs": "API文档",
             "/redoc": "API文档(ReDoc)"
-        }
+        },
+        "api_key_required": True,
+        "api_key_info": API_KEY_INFO
     }
 
 @app.post("/rank", response_model=RankResponse)
-async def query_rank(query: ScoreQuery):
+async def query_rank(
+    query: ScoreQuery,
+    api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
     """
     查询2025年天津市六区中考成绩位次
     
     - **score**: 中考分数（0-800分，支持0.1分精度）
+    - **X-API-Key**: API密钥（通过请求头传递）
     """
     print(f"🔍 [DEBUG] 收到查询请求: score={query.score}")
+    
+    # 验证API密钥
+    try:
+        is_valid = await verify_api_key_with_delay(api_key)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [AUTH] 密钥验证异常: {str(e)}")
+        is_valid = False
     print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
     print(f"🔍 [DEBUG] 目录内容: {os.listdir('.')}")
     
@@ -123,8 +156,10 @@ async def query_rank(query: ScoreQuery):
             print(f"🔍 [DEBUG] 文件大小: {os.path.getsize(db_path)} bytes")
     
     try:
-        # 验证分数精度（支持0.01分）
-        if round(query.score * 100) != query.score * 100:
+        # 验证分数精度（支持0.01分，修复浮点数精度问题）
+        score_str = str(query.score)
+        decimal_index = score_str.find('.')
+        if decimal_index != -1 and len(score_str) - decimal_index - 1 > 2:
             raise HTTPException(
                 status_code=400,
                 detail="分数仅支持保留两位小数（如750.25、750.50）"
@@ -148,6 +183,8 @@ async def query_rank(query: ScoreQuery):
         
         print(f"🔍 [DEBUG] 分析完成，准备返回结果")
         
+        # 无论是否有有效密钥，都返回真实数据
+        # （延迟和错误已经在 verify_api_key_with_delay 中处理）
         return RankResponse(
             score=query.score,
             rank=rank_result['rank'],
@@ -209,6 +246,63 @@ async def get_statistics():
         raise HTTPException(
             status_code=500,
             detail=f"获取统计信息失败：{str(e)}"
+        )
+
+class RecommendationQuery(BaseModel):
+    rank: int = Field(..., ge=1, le=40000, description="市六区位次")
+    
+class RecommendationResponse(BaseModel):
+    rank: int
+    recommendations: dict
+    total_schools: int
+
+@app.post("/recommend", response_model=RecommendationResponse)
+async def get_recommendations(
+    query: RecommendationQuery,
+    api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """
+    根据市六区位次推荐志愿学校（冲稳保）
+    
+    - **rank**: 市六区位次（1-40000）
+    - **X-API-Key**: API密钥（通过请求头传递）
+    """
+    print(f"🔍 [DEBUG] 收到推荐请求: rank={query.rank}")
+    
+    # 验证API密钥
+    try:
+        is_valid = await verify_api_key_with_delay(api_key)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [AUTH] 密钥验证异常: {str(e)}")
+        is_valid = False
+    
+    try:
+        # 获取推荐结果
+        recommendations = recommend_schools_by_rank(query.rank)
+        
+        # 计算总推荐学校数
+        total_schools = sum(len(schools) for schools in recommendations.values())
+        
+        print(f"🔍 [DEBUG] 推荐完成: 冲{len(recommendations['冲'])}所，稳{len(recommendations['稳'])}所，保{len(recommendations['保'])}所")
+        
+        # 无论是否有有效密钥，都返回真实数据
+        # （延迟和错误已经在 verify_api_key_with_delay 中处理）
+        
+        return RecommendationResponse(
+            rank=query.rank,
+            recommendations=recommendations,
+            total_schools=total_schools
+        )
+        
+    except Exception as e:
+        print(f"❌ [DEBUG] 推荐失败: {str(e)}")
+        import traceback
+        print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"推荐失败：{str(e)}"
         )
 
 if __name__ == "__main__":
