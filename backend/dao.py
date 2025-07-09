@@ -1,16 +1,22 @@
 """
 数据访问层（Data Access Object）
-统一管理所有数据库操作
+使用静态数据替代数据库
 """
-import sqlite3
 import logging
-from contextlib import contextmanager
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 from datetime import datetime
 import numpy as np
 
-from config import settings
+from data import (
+    SCORE_RECORDS, 
+    get_data_by_year, 
+    get_available_years, 
+    get_year_stats, 
+    find_record_by_score, 
+    get_adjacent_records,
+    get_score_distribution
+)
 
 
 logger = logging.getLogger(__name__)
@@ -34,50 +40,13 @@ class ScoreRecord:
         }
 
 
-class DatabaseConnection:
-    """数据库连接管理器"""
-    
-    def __init__(self, db_path: str = None):
-        self.db_path = db_path or settings.db_path
-        self._connection = None
-    
-    @contextmanager
-    def get_connection(self):
-        """获取数据库连接的上下文管理器"""
-        conn = sqlite3.connect(
-            self.db_path,
-            timeout=settings.db_timeout,
-            check_same_thread=False
-        )
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        except sqlite3.Error as e:
-            logger.error(f"数据库错误: {e}")
-            raise
-        finally:
-            conn.close()
-    
-    def execute_query(self, query: str, params: tuple = ()) -> List[sqlite3.Row]:
-        """执行查询并返回结果"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.fetchall()
-    
-    def execute_one(self, query: str, params: tuple = ()) -> Optional[sqlite3.Row]:
-        """执行查询并返回单个结果"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.fetchone()
+# 数据库连接类已被移除，现在直接使用静态数据
 
 
 class ScoreDAO:
-    """分数数据访问对象"""
+    """分数数据访问对象 - 使用静态数据"""
     
-    def __init__(self, db_connection: Optional[DatabaseConnection] = None):
-        self.db = db_connection or DatabaseConnection()
+    def __init__(self):
         self._cache = {}  # 简单的内存缓存
     
     def get_score_records(self, year: int) -> List[ScoreRecord]:
@@ -85,78 +54,75 @@ class ScoreDAO:
         cache_key = f"records_{year}"
         
         # 检查缓存
-        if settings.enable_cache and cache_key in self._cache:
+        if cache_key in self._cache:
             logger.debug(f"从缓存获取 {year} 年数据")
             return self._cache[cache_key]
         
-        query = """
-            SELECT year, score, inner_six
-            FROM score_records
-            WHERE year = ? AND inner_six > 0
-            ORDER BY score DESC
-        """
-        
-        rows = self.db.execute_query(query, (year,))
+        # 从静态数据获取
+        year_data = get_data_by_year(year)
         records = [
             ScoreRecord(
-                year=row['year'],
-                score=row['score'],
-                inner_six=row['inner_six']
+                year=record['year'],
+                score=record['score'],
+                inner_six=record['inner_six']
             )
-            for row in rows
+            for record in year_data if record['inner_six'] > 0
         ]
         
+        # 按分数降序排列
+        records.sort(key=lambda x: x.score, reverse=True)
+        
         # 存入缓存
-        if settings.enable_cache:
-            self._cache[cache_key] = records
+        self._cache[cache_key] = records
         
         return records
     
     def get_score_record(self, year: int, score: int) -> Optional[ScoreRecord]:
         """获取特定年份和分数的记录"""
-        query = """
-            SELECT year, score, inner_six
-            FROM score_records
-            WHERE year = ? AND score = ?
-        """
-        
-        row = self.db.execute_one(query, (year, score))
-        if row:
+        record = find_record_by_score(year, score)
+        if record:
             return ScoreRecord(
-                year=row['year'],
-                score=row['score'],
-                inner_six=row['inner_six']
+                year=record['year'],
+                score=record['score'],
+                inner_six=record['inner_six']
             )
         return None
     
     def get_adjacent_scores(self, year: int, score: float) -> Tuple[Optional[ScoreRecord], Optional[ScoreRecord]]:
         """获取相邻的两个分数记录（用于插值）"""
-        floor_score = int(score)
-        ceil_score = floor_score + 1
+        higher_record, lower_record = get_adjacent_records(year, score)
         
-        floor_record = self.get_score_record(year, floor_score)
-        ceil_record = self.get_score_record(year, ceil_score)
+        higher_score_record = None
+        lower_score_record = None
         
-        return floor_record, ceil_record
+        if higher_record:
+            higher_score_record = ScoreRecord(
+                year=higher_record['year'],
+                score=higher_record['score'],
+                inner_six=higher_record['inner_six']
+            )
+        
+        if lower_record:
+            lower_score_record = ScoreRecord(
+                year=lower_record['year'],
+                score=lower_record['score'],
+                inner_six=lower_record['inner_six']
+            )
+        
+        return higher_score_record, lower_score_record
     
     def get_total_students(self, year: int) -> int:
         """获取指定年份的总学生数"""
         cache_key = f"total_{year}"
         
-        if settings.enable_cache and cache_key in self._cache:
+        if cache_key in self._cache:
             return self._cache[cache_key]
         
-        query = """
-            SELECT MAX(inner_six) as total
-            FROM score_records
-            WHERE year = ?
-        """
+        # 从静态数据获取最大inner_six值
+        year_data = get_data_by_year(year)
+        total = max((record['inner_six'] for record in year_data), default=0)
         
-        row = self.db.execute_one(query, (year,))
-        total = row['total'] if row and row['total'] else 0
-        
-        if settings.enable_cache:
-            self._cache[cache_key] = total
+        self._cache[cache_key] = total
         
         return total
     
@@ -184,73 +150,20 @@ class ScoreDAO:
     
     def get_score_statistics(self, year: int) -> Dict[str, Any]:
         """获取分数统计信息"""
-        query = """
-            SELECT 
-                MAX(CASE WHEN inner_six > 0 THEN score ELSE NULL END) as max_score,
-                MIN(CASE WHEN inner_six > 0 THEN score ELSE NULL END) as min_score,
-                COUNT(DISTINCT score) as score_levels,
-                MAX(inner_six) as total_students
-            FROM score_records
-            WHERE year = ?
-        """
-        
-        row = self.db.execute_one(query, (year,))
-        if row:
+        stats = get_year_stats(year)
+        if stats:
             return {
-                "max_score": row['max_score'],
-                "min_score": row['min_score'],
-                "score_levels": row['score_levels'],
-                "total_students": row['total_students'],
+                "max_score": stats['max_score'],
+                "min_score": stats['min_score'],
+                "score_levels": stats['record_count'],
+                "total_students": stats['total_students'],
                 "year": year
             }
         return {}
     
     def get_score_distribution(self, year: int) -> List[Dict[str, Any]]:
         """获取分数段分布"""
-        query = """
-            WITH score_ranges AS (
-                SELECT 
-                    score,
-                    inner_six,
-                    CASE 
-                        WHEN score >= 750 THEN '750分以上'
-                        WHEN score >= 700 THEN '700-749分'
-                        WHEN score >= 650 THEN '650-699分'
-                        WHEN score >= 600 THEN '600-649分'
-                        WHEN score >= 550 THEN '550-599分'
-                        ELSE '550分以下'
-                    END as score_range,
-                    CASE 
-                        WHEN score >= 750 THEN 1
-                        WHEN score >= 700 THEN 2
-                        WHEN score >= 650 THEN 3
-                        WHEN score >= 600 THEN 4
-                        WHEN score >= 550 THEN 5
-                        ELSE 6
-                    END as range_order
-                FROM score_records
-                WHERE year = ?
-            )
-            SELECT 
-                score_range,
-                MIN(score) as min_score,
-                MAX(score) as max_score,
-                MAX(inner_six) - MIN(inner_six) as student_count
-            FROM score_ranges
-            GROUP BY score_range, range_order
-            ORDER BY range_order
-        """
-        
-        rows = self.db.execute_query(query, (year,))
-        return [
-            {
-                "range": row['score_range'],
-                "min_score": row['min_score'],
-                "max_score": row['max_score'],
-                "count": row['student_count']
-            }
-            for row in rows
-        ]
+        return get_score_distribution(year)
     
     def get_percentile_score(self, year: int, percentile: float) -> Optional[int]:
         """根据百分位获取对应的分数"""
@@ -264,16 +177,15 @@ class ScoreDAO:
         # 计算目标排名
         target_rank = int(total_students * (1 - percentile / 100))
         
-        query = """
-            SELECT score
-            FROM score_records
-            WHERE year = ? AND inner_six >= ?
-            ORDER BY inner_six ASC
-            LIMIT 1
-        """
+        # 从静态数据中查找
+        year_data = get_data_by_year(year)
+        year_data.sort(key=lambda x: x['inner_six'])
         
-        row = self.db.execute_one(query, (year, target_rank))
-        return row['score'] if row else None
+        for record in year_data:
+            if record['inner_six'] >= target_rank:
+                return record['score']
+        
+        return None
     
     def clear_cache(self):
         """清空缓存"""
@@ -282,40 +194,26 @@ class ScoreDAO:
     
     def get_years(self) -> List[int]:
         """获取所有可用年份"""
-        query = """
-            SELECT DISTINCT year
-            FROM score_records
-            ORDER BY year DESC
-        """
-        
-        rows = self.db.execute_query(query)
-        return [row['year'] for row in rows]
+        return get_available_years()
     
-    def verify_database(self) -> bool:
-        """验证数据库完整性"""
+    def verify_data(self) -> bool:
+        """验证数据完整性"""
         try:
-            # 检查表是否存在
-            query = """
-                SELECT name FROM sqlite_master 
-                WHERE type='table' AND name='score_records'
-            """
-            row = self.db.execute_one(query)
-            if not row:
-                logger.error("数据表 score_records 不存在")
-                return False
-            
             # 检查是否有数据
-            query = "SELECT COUNT(*) as count FROM score_records"
-            row = self.db.execute_one(query)
-            if row['count'] == 0:
-                logger.error("数据表为空")
+            if not SCORE_RECORDS:
+                logger.error("静态数据为空")
                 return False
             
-            logger.info(f"数据库验证通过，包含 {row['count']} 条记录")
+            years = get_available_years()
+            if not years:
+                logger.error("没有可用年份数据")
+                return False
+            
+            logger.info(f"数据验证通过，包含 {len(SCORE_RECORDS)} 条记录，年份: {years}")
             return True
             
         except Exception as e:
-            logger.error(f"数据库验证失败: {e}")
+            logger.error(f"数据验证失败: {e}")
             return False
 
 
@@ -327,8 +225,8 @@ if __name__ == "__main__":
     # 测试DAO
     logging.basicConfig(level=logging.INFO)
     
-    # 验证数据库
-    if score_dao.verify_database():
+    # 验证数据
+    if score_dao.verify_data():
         # 获取统计信息
         stats = score_dao.get_score_statistics(2024)
         print(f"2024年统计信息: {stats}")
