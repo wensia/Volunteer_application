@@ -12,14 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-import sqlite3
 from typing import Optional
-from contextlib import contextmanager
 from rank_calculator import calculate_enhanced_rank, get_detailed_analysis
+from data import get_year_stats, get_score_distribution
 
 app = FastAPI(
     title="天津中考位次查询API",
-    description="查询2024年天津市六区中考成绩位次",
+    description="查询2025年天津市六区中考成绩位次",
     version="1.0.0"
 )
 
@@ -43,45 +42,17 @@ class ScoreQuery(BaseModel):
 
 class RankResponse(BaseModel):
     score: float
-    rank: int
+    rank: int  # 全市排名
+    inner_rank: int  # 市六区排名
     rank_range: dict  # 添加排名区间
     segment_count: int  # 添加该分数段人数
-    total_students: int
-    percentage: float
+    total_students: int  # 全市总学生数
+    total_students_inner: int  # 市六区总学生数
+    percentage: float  # 全市百分位
+    inner_percentage: float  # 市六区百分位
     analysis: str
 
-# 数据库连接管理
-@contextmanager
-def get_db():
-    print(f"🔍 [DEBUG] get_db 尝试连接数据库: scores.db")
-    print(f"🔍 [DEBUG] get_db 当前工作目录: {os.getcwd()}")
-    print(f"🔍 [DEBUG] get_db 数据库文件存在: {os.path.exists('scores.db')}")
-    
-    # 尝试不同的数据库路径
-    db_paths = ['scores.db', '/app/backend/scores.db', './scores.db']
-    db_path = None
-    
-    for path in db_paths:
-        if os.path.exists(path):
-            db_path = path
-            print(f"🔍 [DEBUG] get_db 找到数据库文件: {path}")
-            break
-    
-    if not db_path:
-        print(f"❌ [DEBUG] get_db 未找到数据库文件，检查过的路径: {db_paths}")
-        raise FileNotFoundError("数据库文件未找到")
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        print(f"🔍 [DEBUG] get_db 数据库连接成功: {db_path}")
-        yield conn
-    except Exception as e:
-        print(f"❌ [DEBUG] get_db 数据库连接失败: {e}")
-        raise
-    finally:
-        conn.close()
-        print(f"🔍 [DEBUG] get_db 数据库连接已关闭")
+# 数据库连接管理已被移除，现在直接使用静态数据
 
 # 这些函数已经从 rank_calculator 模块导入，不再需要在这里定义
 
@@ -135,7 +106,7 @@ async def api_info():
 @app.post("/rank", response_model=RankResponse)
 async def query_rank(query: ScoreQuery):
     """
-    查询2024年天津市六区中考成绩位次
+    查询2025年天津市六区中考成绩位次
     
     - **score**: 中考分数（0-800分，支持0.1分精度）
     """
@@ -162,7 +133,7 @@ async def query_rank(query: ScoreQuery):
         print(f"🔍 [DEBUG] 开始调用 calculate_enhanced_rank...")
         
         # 使用增强版的计算函数
-        rank_result = calculate_enhanced_rank(query.score, year=2024, db_path='scores.db')
+        rank_result = calculate_enhanced_rank(query.score, year=2025)
         
         print(f"🔍 [DEBUG] 计算结果: {rank_result}")
         
@@ -180,10 +151,13 @@ async def query_rank(query: ScoreQuery):
         return RankResponse(
             score=query.score,
             rank=rank_result['rank'],
+            inner_rank=rank_result['inner_rank'],
             rank_range=rank_result['rank_range'],
             segment_count=rank_result['segment_count'],
             total_students=rank_result['total_students'],
+            total_students_inner=rank_result['total_students_inner'],
             percentage=rank_result['percentage'],
+            inner_percentage=rank_result['inner_percentage'],
             analysis=analysis
         )
         
@@ -199,69 +173,34 @@ async def query_rank(query: ScoreQuery):
 
 @app.get("/stats")
 async def get_statistics():
-    """获取2024年市六区统计信息"""
+    """获取2025年市六区统计信息"""
     print(f"🔍 [DEBUG] /stats 请求开始")
-    print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
-    
-    # 检查数据库文件
-    db_paths_to_check = ['scores.db', '/app/backend/scores.db']
-    for db_path in db_paths_to_check:
-        exists = os.path.exists(db_path)
-        print(f"🔍 [DEBUG] /stats 数据库路径 {db_path}: {'存在' if exists else '不存在'}")
     
     try:
-        print(f"🔍 [DEBUG] 准备连接数据库...")
-        with get_db() as conn:
-            print(f"🔍 [DEBUG] 数据库连接成功")
-            cursor = conn.cursor()
-            
-            # 获取最高分、最低分、总人数
-            cursor.execute("""
-                SELECT 
-                    MAX(CASE WHEN inner_six > 0 THEN score ELSE NULL END) as max_score,
-                    MIN(CASE WHEN inner_six > 0 THEN score ELSE NULL END) as min_score,
-                    SUM(inner_six) as total_students
-                FROM score_records
-                WHERE year = 2024
-            """)
-            result = cursor.fetchone()
-            print(f"🔍 [DEBUG] 基础统计查询完成: {dict(result)}")
-            
-            # 获取各分数段人数
-            cursor.execute("""
-                SELECT 
-                    CASE 
-                        WHEN score >= 750 THEN '750分以上'
-                        WHEN score >= 700 THEN '700-749分'
-                        WHEN score >= 650 THEN '650-699分'
-                        WHEN score >= 600 THEN '600-649分'
-                        WHEN score >= 550 THEN '550-599分'
-                        ELSE '550分以下'
-                    END as score_range,
-                    SUM(inner_six) as count
-                FROM score_records
-                WHERE year = 2024
-                GROUP BY score_range
-                ORDER BY MIN(score) DESC
-            """)
-            
-            score_distribution = [
-                {"range": row[0], "count": row[1]} 
-                for row in cursor.fetchall()
-            ]
-            print(f"🔍 [DEBUG] 分数分布查询完成: {score_distribution}")
-            
-            response_data = {
-                "year": 2024,
-                "region": "天津市六区",
-                "max_score": result['max_score'],
-                "min_score": result['min_score'],
-                "total_students": result['total_students'],
-                "score_distribution": score_distribution
-            }
-            print(f"🔍 [DEBUG] /stats 响应数据准备完成")
-            return response_data
-            
+        print(f"🔍 [DEBUG] 从静态数据获取统计信息...")
+        
+        # 获取基础统计信息
+        stats = get_year_stats(2025)
+        if not stats:
+            raise HTTPException(status_code=404, detail="未找到2025年数据")
+        
+        print(f"🔍 [DEBUG] 基础统计查询完成: {stats}")
+        
+        # 获取分数段分布
+        score_distribution = get_score_distribution(2025)
+        print(f"🔍 [DEBUG] 分数分布查询完成: {score_distribution}")
+        
+        response_data = {
+            "year": 2025,
+            "region": "天津市六区",
+            "max_score": stats['max_score'],
+            "min_score": stats['min_score'],
+            "total_students": stats['total_students'],
+            "score_distribution": score_distribution
+        }
+        print(f"🔍 [DEBUG] /stats 响应数据准备完成")
+        return response_data
+        
     except Exception as e:
         print(f"❌ [DEBUG] /stats 错误: {str(e)}")
         print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")

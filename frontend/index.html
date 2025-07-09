@@ -549,7 +549,7 @@
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                             <div className="flex justify-between h-16">
                                 <div className="flex items-center">
-                                    <h1 className="text-xl font-semibold">天津中考位次查询（市六区）</h1>
+                                    <h1 className="text-xl font-semibold">天津中考位次查询（全市/市六区）</h1>
                                 </div>
                             </div>
                         </div>
@@ -563,7 +563,7 @@
                                 <div className="p-6">
                                     <div className="text-center mb-6">
                                         <h2 className="text-lg font-semibold">中考成绩位次查询</h2>
-                                        <p className="mt-1 text-sm text-slate-500">输入您的中考总分，查询市六区排名</p>
+                                        <p className="mt-1 text-sm text-slate-500">输入您的中考总分，查询全市及市六区排名</p>
                                     </div>
 
                                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -587,7 +587,7 @@
                                                     <span className="text-slate-500 text-sm">分</span>
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-slate-500">满分 800 分，支持 0.01 分精度（如 760.25、650.50）</p>
+                                            <p className="text-xs text-slate-500">请输入500-780之间的分数，支持 0.01 分精度（如 760.25、650.50）</p>
                                         </div>
 
                                         {error && (
@@ -625,8 +625,17 @@
                                                         <p className="text-lg font-semibold mt-1">{result.score} 分</p>
                                                     </div>
                                                     <div className="bg-white rounded-md p-3 border border-slate-200">
+                                                        <p className="text-xs font-medium text-slate-500">超过考生</p>
+                                                        <p className="text-lg font-semibold mt-1">全市 {result.percentage}%</p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">市六区 {result.inner_percentage}%</p>
+                                                    </div>
+                                                    <div className="bg-white rounded-md p-3 border border-slate-200">
                                                         <p className="text-xs font-medium text-slate-500">市六区位次</p>
-                                                        <p className="text-lg font-semibold mt-1">第 {result.rank.toLocaleString()} 名</p>
+                                                        <p className="text-lg font-semibold mt-1">约为第 {result.inner_rank.toLocaleString()} 名</p>
+                                                    </div>
+                                                    <div className="bg-white rounded-md p-3 border border-slate-200">
+                                                        <p className="text-xs font-medium text-slate-500">全市位次</p>
+                                                        <p className="text-lg font-semibold mt-1">约为第 {result.rank.toLocaleString()} 名</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -638,19 +647,15 @@
                             {/* 统计信息 */}
                             {stats && (
                                 <div className="mt-6 card p-4">
-                                    <h3 className="text-sm font-medium mb-3">2024年市六区数据统计</h3>
+                                    <h3 className="text-sm font-medium mb-3">2025年中考数据统计</h3>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-slate-600">最高分</span>
-                                            <span className="font-medium">{stats.max_score} 分</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-600">最低分</span>
-                                            <span className="font-medium">{stats.min_score} 分</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-600">总人数</span>
+                                            <span className="text-slate-600">市六区总人数（500分以上）</span>
                                             <span className="font-medium">{stats.total_students?.toLocaleString()} 人</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">全市总人数（500分以上）</span>
+                                            <span className="font-medium">{result && result.total_students ? result.total_students.toLocaleString() : '100,244'} 人</span>
                                         </div>
                                     </div>
                                 </div>
@@ -662,11 +667,11 @@
                                 <ul className="space-y-2 text-sm text-slate-600">
                                     <li className="flex items-start">
                                         <CheckIcon />
-                                        <span className="ml-1.5">仅计算天津市六区（市内六区）位次</span>
+                                        <span className="ml-1.5">同时计算全市及市六区位次排名</span>
                                     </li>
                                     <li className="flex items-start">
                                         <CheckIcon />
-                                        <span className="ml-1.5">数据基于2024年中考成绩</span>
+                                        <span className="ml-1.5">数据基于2025年中考成绩</span>
                                     </li>
                                     <li className="flex items-start">
                                         <CheckIcon />
@@ -679,7 +684,7 @@
 
                     {/* 页脚 */}
                     <footer className="mt-12 py-6 text-center text-xs text-slate-400 border-t">
-                        <p>© 2024 天津中考位次查询系统 | 数据仅供参考</p>
+                        <p>© 2025 天津中考位次查询系统 | 数据仅供参考</p>
                     </footer>
                 </div>
             );

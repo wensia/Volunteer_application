@@ -1,107 +1,97 @@
 """
-天津市六区中考位次计算模块 - 改进版
+天津市中考位次计算模块 - 改进版
 使用精确的线性插值算法处理小数分数
+现在使用静态数据替代数据库
+同时支持全市排名和市六区排名
 """
 
-import sqlite3
 import numpy as np
-from typing import Dict, List, Optional, Tuple
-from contextlib import contextmanager
+from typing import Dict, List, Optional, Tuple, Any
+from data import get_data_by_year
 
 
-@contextmanager
-def get_db_connection(db_path: str = 'scores.db'):
-    """数据库连接上下文管理器"""
-    print(f"🔍 [DEBUG] get_db_connection 尝试连接: {db_path}")
-    
-    import os
-    if not os.path.exists(db_path):
-        print(f"❌ [DEBUG] 数据库文件不存在: {db_path}")
-        print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
-        print(f"🔍 [DEBUG] 目录内容: {os.listdir('.')}")
-        raise FileNotFoundError(f"数据库文件不存在: {db_path}")
-    
-    print(f"🔍 [DEBUG] 数据库文件存在，大小: {os.path.getsize(db_path)} bytes")
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        print(f"🔍 [DEBUG] 数据库连接成功: {db_path}")
-        yield conn
-    except Exception as e:
-        print(f"❌ [DEBUG] 数据库连接失败: {e}")
-        raise
-    finally:
-        conn.close()
-        print(f"🔍 [DEBUG] 数据库连接已关闭")
+# 数据库连接函数已被移除，现在直接使用静态数据
 
 
 class ImprovedRankCalculator:
-    """改进版排名计算器，使用更精确的线性插值"""
+    """改进版排名计算器，使用更精确的线性插值，支持全市和市六区排名"""
     
-    def __init__(self, year: int = 2024, db_path: str = 'scores.db'):
+    def __init__(self, year: int = 2025):
         self.year = year
-        self.db_path = db_path
-        self.score_rank_map = {}  # 分数到排名的映射
-        self.sorted_scores = []   # 排序后的分数列表
-        self.total_students = 0
+        self.score_rank_map_city = {}     # 分数到全市排名的映射
+        self.score_rank_map_inner = {}    # 分数到市六区排名的映射
+        self.sorted_scores = []           # 排序后的分数列表
+        self.total_students_city = 0      # 全市总学生数
+        self.total_students_inner = 0     # 市六区总学生数
         self._load_data()
     
     def _load_data(self):
-        """从数据库加载数据"""
-        print(f"🔍 [DEBUG] _load_data 开始加载数据，年份: {self.year}, 数据库: {self.db_path}")
+        """从静态数据加载数据"""
+        print(f"🔍 [DEBUG] _load_data 开始加载数据，年份: {self.year}")
         
-        with get_db_connection(self.db_path) as conn:
-            cursor = conn.cursor()
+        # 从静态数据获取指定年份的数据
+        year_data = get_data_by_year(self.year)
+        print(f"🔍 [DEBUG] 获取到 {len(year_data)} 条记录")
+        
+        if not year_data:
+            print(f"❌ [DEBUG] 静态数据中没有{self.year}年的数据")
+            raise ValueError(f"静态数据中没有{self.year}年的数据")
+        
+        # 构建分数到排名的映射（全市和市六区）
+        for record in year_data:
+            score = float(record['score'])
             
-            print(f"🔍 [DEBUG] 执行SQL查询...")
-            # 获取所有分数数据
-            cursor.execute("""
-                SELECT score, inner_six
-                FROM score_records
-                WHERE year = ? AND inner_six > 0
-                ORDER BY score DESC
-            """, (self.year,))
+            # 全市排名
+            if record['total_city'] > 0:
+                city_rank = int(record['total_city'])
+                self.score_rank_map_city[score] = city_rank
+                if score not in self.sorted_scores:
+                    self.sorted_scores.append(score)
             
-            data = cursor.fetchall()
-            print(f"🔍 [DEBUG] 查询结果: {len(data)} 条记录")
-            
-            if not data:
-                print(f"❌ [DEBUG] 数据库中没有{self.year}年的数据")
-                raise ValueError(f"数据库中没有{self.year}年的数据")
-            
-            # 构建分数到排名的映射
-            for row in data:
-                score = float(row['score'])
-                rank = int(row['inner_six'])
-                self.score_rank_map[score] = rank
-                self.sorted_scores.append(score)
-            
-            # 确保分数按降序排列
-            self.sorted_scores.sort(reverse=True)
-            
-            # 总人数是最大的累计值
-            self.total_students = max(row['inner_six'] for row in data)
-            
-            print(f"🔍 [DEBUG] 数据加载完成:")
-            print(f"🔍 [DEBUG] - 总记录数: {len(data)}")
-            print(f"🔍 [DEBUG] - 最高分: {max(self.sorted_scores)}")
-            print(f"🔍 [DEBUG] - 最低分: {min(self.sorted_scores)}")
-            print(f"🔍 [DEBUG] - 总学生数: {self.total_students}")
+            # 市六区排名
+            if record['inner_six'] > 0:
+                inner_rank = int(record['inner_six'])
+                self.score_rank_map_inner[score] = inner_rank
+                if score not in self.sorted_scores:
+                    self.sorted_scores.append(score)
+        
+        # 确保分数按降序排列
+        self.sorted_scores = list(set(self.sorted_scores))
+        self.sorted_scores.sort(reverse=True)
+        
+        # 总人数是最大的累计值
+        self.total_students_city = max(record['total_city'] for record in year_data if record['total_city'] > 0)
+        self.total_students_inner = max(record['inner_six'] for record in year_data if record['inner_six'] > 0)
+        
+        print(f"🔍 [DEBUG] 数据加载完成:")
+        print(f"🔍 [DEBUG] - 总记录数: {len(self.sorted_scores)}")
+        print(f"🔍 [DEBUG] - 最高分: {max(self.sorted_scores) if self.sorted_scores else 0}")
+        print(f"🔍 [DEBUG] - 最低分: {min(self.sorted_scores) if self.sorted_scores else 0}")
+        print(f"🔍 [DEBUG] - 全市总学生数: {self.total_students_city}")
+        print(f"🔍 [DEBUG] - 市六区总学生数: {self.total_students_inner}")
     
-    def _linear_interpolate(self, score: float) -> int:
+    def _linear_interpolate(self, score: float, rank_type: str = 'city') -> int:
         """
         使用线性插值计算精确位次
         
         参数:
             score: 要查询的分数（支持小数）
+            rank_type: 排名类型 ('city' 全市, 'inner' 市六区)
             
         返回:
             插值计算得到的排名
         """
+        # 选择对应的数据
+        if rank_type == 'city':
+            score_rank_map = self.score_rank_map_city
+            total_students = self.total_students_city
+        else:
+            score_rank_map = self.score_rank_map_inner
+            total_students = self.total_students_inner
+        
         # 如果分数正好在数据中，直接返回
-        if score in self.score_rank_map:
-            return self.score_rank_map[score]
+        if score in score_rank_map:
+            return score_rank_map[score]
         
         # 找到相邻的两个分数
         higher_score = None
@@ -119,14 +109,32 @@ class ImprovedRankCalculator:
         if higher_score is None:  # 分数高于最高分
             return 1
         if lower_score is None:  # 分数低于最低分
-            return self.total_students
+            return total_students
+        
+        # 检查两个分数在对应排名类型中是否都有数据
+        if higher_score not in score_rank_map or lower_score not in score_rank_map:
+            # 如果某个分数没有对应类型的数据，查找其他相邻分数
+            for s in self.sorted_scores:
+                if s in score_rank_map:
+                    if s > score and (higher_score is None or s < higher_score):
+                        higher_score = s
+                    elif s < score and (lower_score is None or s > lower_score):
+                        lower_score = s
+        
+        # 如果还是找不到合适的数据点，返回边界值
+        if higher_score not in score_rank_map or lower_score not in score_rank_map:
+            if higher_score in score_rank_map:
+                return score_rank_map[higher_score]
+            elif lower_score in score_rank_map:
+                return score_rank_map[lower_score]
+            else:
+                return total_students
         
         # 线性插值计算
-        higher_rank = self.score_rank_map[higher_score]
-        lower_rank = self.score_rank_map[lower_score]
+        higher_rank = score_rank_map[higher_score]
+        lower_rank = score_rank_map[lower_score]
         
         # 计算插值比例
-        # 分数差值的比例
         score_range = lower_score - higher_score
         score_diff = score - higher_score
         fraction = score_diff / score_range
@@ -138,15 +146,15 @@ class ImprovedRankCalculator:
         # 四舍五入到最近的整数
         return int(round(interpolated_rank))
     
-    def calculate_rank(self, score: float) -> Dict[str, any]:
+    def calculate_rank(self, score: float) -> Dict[str, Any]:
         """
-        计算精确的市六区排名位次
+        计算精确的全市和市六区排名位次
         
         参数:
             score: 中考分数（支持0.01精度）
         
         返回:
-            包含排名信息的字典
+            包含全市和市六区排名信息的字典
         """
         
         # 验证分数
@@ -157,18 +165,23 @@ class ImprovedRankCalculator:
         if not np.isclose(score * 100, np.round(score * 100)):
             raise ValueError(f"分数仅支持保留两位小数，当前输入：{score}")
         
-        # 计算排名
-        rank = self._linear_interpolate(score)
+        # 计算全市排名
+        city_rank = self._linear_interpolate(score, 'city')
+        city_rank = max(1, min(city_rank, self.total_students_city))
         
-        # 确保排名在有效范围内
-        rank = max(1, min(rank, self.total_students))
+        # 计算市六区排名
+        inner_rank = self._linear_interpolate(score, 'inner')
+        inner_rank = max(1, min(inner_rank, self.total_students_inner))
         
         # 计算百分位
-        percentage = round((rank / self.total_students) * 100, 2)
-        percentile = round(((self.total_students - rank + 1) / self.total_students) * 100, 2)
+        city_percentage = round((city_rank / self.total_students_city) * 100, 2)
+        city_percentile = round(((self.total_students_city - city_rank + 1) / self.total_students_city) * 100, 2)
+        
+        inner_percentage = round((inner_rank / self.total_students_inner) * 100, 2)
+        inner_percentile = round(((self.total_students_inner - inner_rank + 1) / self.total_students_inner) * 100, 2)
         
         # 判断计算方法
-        if score in self.score_rank_map:
+        if score in self.score_rank_map_city and score in self.score_rank_map_inner:
             method = "精确匹配（数据库中存在该分数）"
         else:
             # 找到用于插值的分数
@@ -188,28 +201,35 @@ class ImprovedRankCalculator:
         return {
             'score': float(score),
             'year': self.year,
-            'rank': int(rank),
-            'total_students': self.total_students,
-            'percentage': float(percentage),
-            'percentile': float(percentile),
+            'city_rank': int(city_rank),
+            'inner_rank': int(inner_rank),
+            'total_students_city': self.total_students_city,
+            'total_students_inner': self.total_students_inner,
+            'city_percentage': float(city_percentage),
+            'city_percentile': float(city_percentile),
+            'inner_percentage': float(inner_percentage),
+            'inner_percentile': float(inner_percentile),
             'calculation_method': method,
             'rank_range': {
-                'start': rank,
-                'end': rank
+                'start': city_rank,
+                'end': city_rank
             },
             'segment_count': 1,
-            'cumulative_count': rank
+            'cumulative_count': city_rank
         }
     
-    def get_interpolation_details(self, score: float) -> Dict[str, any]:
+    def get_interpolation_details(self, score: float, rank_type: str = 'city') -> Dict[str, Any]:
         """获取插值计算的详细信息（用于调试和验证）"""
+        score_rank_map = self.score_rank_map_city if rank_type == 'city' else self.score_rank_map_inner
+        
         details = {
             'score': score,
-            'exact_match': score in self.score_rank_map
+            'rank_type': rank_type,
+            'exact_match': score in score_rank_map
         }
         
-        if score in self.score_rank_map:
-            details['rank'] = self.score_rank_map[score]
+        if score in score_rank_map:
+            details['rank'] = score_rank_map[score]
             details['method'] = 'exact'
         else:
             # 找到相邻分数
@@ -222,9 +242,9 @@ class ImprovedRankCalculator:
                     lower = s
                     break
             
-            if higher and lower:
-                higher_rank = self.score_rank_map[higher]
-                lower_rank = self.score_rank_map[lower]
+            if higher and lower and higher in score_rank_map and lower in score_rank_map:
+                higher_rank = score_rank_map[higher]
+                lower_rank = score_rank_map[lower]
                 
                 score_range = lower - higher
                 score_diff = score - higher
@@ -236,11 +256,10 @@ class ImprovedRankCalculator:
                     'higher_rank': higher_rank,
                     'lower_rank': lower_rank,
                     'score_range': score_range,
-                    'score_position': score_diff,
-                    'interpolation_fraction': fraction,
-                    'rank_difference': lower_rank - higher_rank,
-                    'calculated_rank': self._linear_interpolate(score),
-                    'method': 'linear_interpolation'
+                    'score_diff': score_diff,
+                    'fraction': fraction,
+                    'interpolated_rank': higher_rank + fraction * (lower_rank - higher_rank),
+                    'method': 'interpolation'
                 })
             else:
                 details['method'] = 'boundary'
@@ -248,77 +267,63 @@ class ImprovedRankCalculator:
         return details
 
 
-# 兼容原有接口
-def calculate_enhanced_rank(score: float, year: int = 2024, db_path: str = 'scores.db') -> Dict[str, any]:
-    """计算增强版的市六区排名位次（兼容接口）"""
-    print(f"🔍 [DEBUG] calculate_enhanced_rank 开始")
-    print(f"🔍 [DEBUG] 参数: score={score}, year={year}, db_path={db_path}")
+def calculate_enhanced_rank(score: float, year: int = 2025, db_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    计算增强的排名信息（包含全市和市六区）
     
-    import os
-    print(f"🔍 [DEBUG] 当前工作目录: {os.getcwd()}")
-    print(f"🔍 [DEBUG] 数据库文件存在: {os.path.exists(db_path)}")
+    参数:
+        score: 中考分数
+        year: 年份
+        db_path: 数据库路径（已废弃，保留兼容性）
     
-    # 尝试不同路径
-    db_paths_to_try = [db_path, '/app/backend/scores.db', './scores.db']
-    actual_db_path = db_path
-    for path in db_paths_to_try:
-        if os.path.exists(path):
-            print(f"🔍 [DEBUG] 找到数据库文件: {path}")
-            actual_db_path = path
-            break
-    else:
-        print(f"❌ [DEBUG] 未找到数据库文件，尝试过的路径: {db_paths_to_try}")
-        raise FileNotFoundError(f"数据库文件未找到")
-    
+    返回:
+        包含详细排名信息的字典
+    """
     try:
-        print(f"🔍 [DEBUG] 创建 ImprovedRankCalculator 实例...")
-        calculator = ImprovedRankCalculator(year, actual_db_path)
-        print(f"🔍 [DEBUG] Calculator 创建成功，总学生数: {calculator.total_students}")
-        
+        calculator = ImprovedRankCalculator(year)
         result = calculator.calculate_rank(score)
-        print(f"🔍 [DEBUG] 计算完成: {result}")
-        return result
+        
+        # 兼容性处理 - 保持原有的返回格式，但添加新的全市排名信息
+        return {
+            'rank': result['city_rank'],  # 主要显示全市排名
+            'inner_rank': result['inner_rank'],  # 市六区排名
+            'total_students': result['total_students_city'],  # 全市总人数
+            'total_students_inner': result['total_students_inner'],  # 市六区总人数
+            'percentage': result['city_percentile'],  # 全市百分位
+            'inner_percentage': result['inner_percentile'],  # 市六区百分位
+            'rank_range': result['rank_range'],
+            'segment_count': result['segment_count'],
+            'calculation_method': result['calculation_method']
+        }
+        
     except Exception as e:
-        print(f"❌ [DEBUG] calculate_enhanced_rank 失败: {e}")
-        import traceback
-        print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
-        raise
+        print(f"❌ [DEBUG] calculate_enhanced_rank 错误: {str(e)}")
+        raise e
 
 
 def get_detailed_analysis(result: Dict[str, any]) -> str:
-    """根据排名信息生成分析建议"""
+    """生成详细的成绩分析"""
     rank = result['rank']
     total = result['total_students']
     percentage = result['percentage']
     
-    # 基础分析
-    if rank <= 100:
-        level = "顶尖水平"
-        schools = "南开、耀华、一中等顶级高中"
-    elif rank <= 500:
-        level = "非常优秀"
-        schools = "市五所等重点高中"
-    elif rank <= 1500:
+    if percentage >= 95:
+        level = "顶尖"
+        advice = "您的成绩非常优秀，在全市名列前茅！"
+    elif percentage >= 85:
         level = "优秀"
-        schools = "实验、新华等优质高中"
-    elif rank <= 3000:
+        advice = "您的成绩很不错，处于全市前列！"
+    elif percentage >= 70:
         level = "良好"
-        schools = "二十中、四中等区重点高中"
-    elif rank <= 6000:
-        level = "中等偏上"
-        schools = "各区的重点高中"
-    elif rank <= 10000:
+        advice = "您的成绩较好，有很大的发展潜力！"
+    elif percentage >= 50:
         level = "中等"
-        schools = "区重点和普通高中"
+        advice = "您的成绩处于中等水平，继续努力会有进步！"
     else:
-        level = "一般"
-        schools = "普通高中，同时可以考虑职业教育等多元化发展路径"
+        level = "待提高"
+        advice = "还有很大的提升空间，加油！"
     
-    analysis = f"您的成绩为{result['score']}分，属于{level}。\n"
-    analysis += f"在市六区排名第{rank}名（前{percentage}%）\n"
-    analysis += f"推荐学校：{schools}"
-    
-    return analysis
+    return f"成绩水平：{level}。{advice}您超过了全市{percentage:.1f}%的考生。"
 
 
 # 测试函数
@@ -333,7 +338,7 @@ if __name__ == "__main__":
     print("\n整数分数测试：")
     for score in [780, 770, 760, 750]:
         result = calculator.calculate_rank(score)
-        print(f"{score}分: 第{result['rank']}名 (前{result['percentage']}%)")
+        print(f"{score}分: 第{result['city_rank']}名 (前{result['city_percentile']}%)")
     
     # 测试小数分数（线性插值）
     print("\n\n小数分数测试（线性插值）：")
@@ -344,14 +349,14 @@ if __name__ == "__main__":
         details = calculator.get_interpolation_details(score)
         
         print(f"\n{score}分:")
-        print(f"  计算排名: 第{result['rank']}名")
+        print(f"  计算排名: 第{result['city_rank']}名")
         print(f"  计算方法: {result['calculation_method']}")
         
-        if details['method'] == 'linear_interpolation':
+        if details['method'] == 'interpolation':
             print(f"  插值详情:")
             print(f"    上界: {details['higher_score']}分 → 第{details['higher_rank']}名")
             print(f"    下界: {details['lower_score']}分 → 第{details['lower_rank']}名")
-            print(f"    插值比例: {details['interpolation_fraction']:.2%}")
+            print(f"    插值比例: {details['fraction']:.2%}")
     
     # 验证线性关系
     print("\n\n验证760-761分之间的线性关系：")
@@ -360,8 +365,8 @@ if __name__ == "__main__":
     
     for score in scores:
         result = calculator.calculate_rank(score)
-        ranks.append(result['rank'])
-        print(f"{score}分: 第{result['rank']}名")
+        ranks.append(result['city_rank'])
+        print(f"{score}分: 第{result['city_rank']}名")
     
     # 检查是否近似线性
     print("\n排名差值：")
