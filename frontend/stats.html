@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>API统计面板 - 天津中考查询系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 移动端优化样式 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 自定义滚动条 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .stat-card {
+            @apply bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow;
+        }
+        
+        .api-key-row:hover {
+            background-color: rgb(249 250 251);
+        }
+        
+        .request-log-row:nth-child(even) {
+            background-color: rgb(249 250 251);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // 刷新图标
+        const RefreshIcon = () => (
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+        );
+        
+        // 加载动画
+        const LoadingSpinner = () => (
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        );
+        
+        // 统计卡片组件
+        const StatCard = ({ title, value, subtitle, color = "blue" }) => {
+            const colorClasses = {
+                blue: "text-blue-600 bg-blue-50",
+                green: "text-green-600 bg-green-50",
+                yellow: "text-yellow-600 bg-yellow-50",
+                red: "text-red-600 bg-red-50",
+                purple: "text-purple-600 bg-purple-50",
+                gray: "text-gray-600 bg-gray-50"
+            };
+            
+            return (
+                <div className="stat-card">
+                    <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+                    <p className={`text-3xl font-bold mt-2 ${colorClasses[color].split(' ')[0]}`}>
+                        {value?.toLocaleString() || '0'}
+                    </p>
+                    {subtitle && (
+                        <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+                    )}
+                </div>
+            );
+        };
+        
+        // 格式化时间
+        const formatTime = (isoString) => {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        };
+        
+        // 格式化时间差
+        const formatTimeDiff = (isoString) => {
+            if (!isoString) return '-';
+            const diff = Date.now() - new Date(isoString).getTime();
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            
+            if (hours > 24) {
+                return `${Math.floor(hours / 24)}天前`;
+            } else if (hours > 0) {
+                return `${hours}小时前`;
+            } else if (minutes > 0) {
+                return `${minutes}分钟前`;
+            } else {
+                return '刚刚';
+            }
+        };
+        
+        // 主应用组件
+        const App = () => {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [autoRefresh, setAutoRefresh] = useState(true);
+            const intervalRef = useRef(null);
+            
+            // 获取统计数据
+            const fetchStats = async () => {
+                try {
+                    const response = await fetch('/api/stats');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    setStats(data);
+                } catch (error) {
+                    console.error('获取统计数据失败:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            // 初始化和自动刷新
+            useEffect(() => {
+                fetchStats();
+                
+                if (autoRefresh) {
+                    intervalRef.current = setInterval(fetchStats, 5000); // 每5秒刷新
+                }
+                
+                return () => {
+                    if (intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                    }
+                };
+            }, [autoRefresh]);
+            
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <LoadingSpinner />
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* 头部 */}
+                    <header className="bg-white shadow-sm border-b">
+                        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center">
+                                <h1 className="text-xl font-semibold">API 统计面板</h1>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoRefresh}
+                                            onChange={(e) => setAutoRefresh(e.target.checked)}
+                                            className="rounded"
+                                        />
+                                        自动刷新
+                                    </label>
+                                    <button
+                                        onClick={fetchStats}
+                                        className="p-2 text-gray-500 hover:text-gray-700"
+                                        title="手动刷新"
+                                    >
+                                        <RefreshIcon />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+                        {/* 汇总统计 */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                            <StatCard
+                                title="总请求数"
+                                value={stats?.summary?.total_requests}
+                                color="blue"
+                            />
+                            <StatCard
+                                title="有效密钥请求"
+                                value={stats?.summary?.valid_key_requests}
+                                color="green"
+                            />
+                            <StatCard
+                                title="无效密钥请求"
+                                value={stats?.summary?.invalid_key_requests}
+                                color="red"
+                            />
+                            <StatCard
+                                title="唯一API密钥"
+                                value={stats?.summary?.unique_api_keys}
+                                color="purple"
+                            />
+                            <StatCard
+                                title="平均响应时间"
+                                value={stats?.summary?.avg_response_time_ms?.toFixed(0)}
+                                subtitle="毫秒"
+                                color="yellow"
+                            />
+                            <StatCard
+                                title="24小时请求"
+                                value={stats?.summary?.requests_24h}
+                                color="gray"
+                            />
+                        </div>
+                        
+                        {/* 端点统计 */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+                            <h2 className="text-lg font-semibold mb-4">端点统计</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {Object.entries(stats?.endpoint_stats || {}).map(([endpoint, count]) => (
+                                    <div key={endpoint} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                                        <span className="font-mono text-sm">{endpoint}</span>
+                                        <span className="font-semibold text-blue-600">{count.toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {/* API密钥统计 */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+                            <h2 className="text-lg font-semibold mb-4">API密钥使用情况</h2>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead>
+                                        <tr className="border-b text-left text-sm text-gray-600">
+                                            <th className="pb-3 pr-4">API密钥</th>
+                                            <th className="pb-3 px-4">总请求</th>
+                                            <th className="pb-3 px-4">成功</th>
+                                            <th className="pb-3 px-4">失败</th>
+                                            <th className="pb-3 px-4">首次使用</th>
+                                            <th className="pb-3 px-4">最后使用</th>
+                                            <th className="pb-3 pl-4">端点分布</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Object.entries(stats?.key_stats || {}).map(([key, data]) => (
+                                            <tr key={key} className="border-b api-key-row">
+                                                <td className="py-3 pr-4 font-mono text-sm">{key}</td>
+                                                <td className="py-3 px-4 font-semibold">{data.total_requests}</td>
+                                                <td className="py-3 px-4 text-green-600">{data.successful_requests}</td>
+                                                <td className="py-3 px-4 text-red-600">{data.failed_requests}</td>
+                                                <td className="py-3 px-4 text-sm text-gray-500">
+                                                    {formatTimeDiff(data.first_seen)}
+                                                </td>
+                                                <td className="py-3 px-4 text-sm text-gray-500">
+                                                    {formatTimeDiff(data.last_seen)}
+                                                </td>
+                                                <td className="py-3 pl-4 text-sm">
+                                                    {Object.entries(data.endpoints || {}).map(([ep, cnt]) => (
+                                                        <span key={ep} className="inline-block mr-2">
+                                                            <span className="font-mono">{ep}</span>
+                                                            <span className="text-gray-500">({cnt})</span>
+                                                        </span>
+                                                    ))}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        {/* 最近请求日志 */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6">
+                            <h2 className="text-lg font-semibold mb-4">最近请求日志（最新50条）</h2>
+                            <div className="overflow-x-auto custom-scrollbar" style={{maxHeight: '400px'}}>
+                                <table className="min-w-full text-sm">
+                                    <thead className="sticky top-0 bg-white border-b">
+                                        <tr className="text-left text-gray-600">
+                                            <th className="pb-2 pr-4">时间</th>
+                                            <th className="pb-2 px-4">端点</th>
+                                            <th className="pb-2 px-4">API密钥</th>
+                                            <th className="pb-2 px-4">状态</th>
+                                            <th className="pb-2 px-4">响应时间</th>
+                                            <th className="pb-2 px-4">客户端IP</th>
+                                            <th className="pb-2 px-4">请求数据</th>
+                                            <th className="pb-2 pl-4">错误</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(stats?.recent_requests || []).reverse().map((req, idx) => (
+                                            <tr key={idx} className="request-log-row border-b">
+                                                <td className="py-2 pr-4 text-gray-500">{formatTime(req.timestamp)}</td>
+                                                <td className="py-2 px-4 font-mono">{req.endpoint}</td>
+                                                <td className="py-2 px-4 font-mono text-xs">{req.api_key || '无'}</td>
+                                                <td className="py-2 px-4">
+                                                    <span className={`inline-block px-2 py-1 text-xs rounded ${
+                                                        req.status_code < 400 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                        {req.status_code}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 px-4">{req.response_time_ms?.toFixed(0)}ms</td>
+                                                <td className="py-2 px-4 text-xs">{req.client_ip}</td>
+                                                <td className="py-2 px-4 font-mono text-xs">
+                                                    {req.request_data ? JSON.stringify(req.request_data) : '-'}
+                                                </td>
+                                                <td className="py-2 pl-4 text-xs text-red-600">
+                                                    {req.error || '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </main>
+                    
+                    {/* 页脚 */}
+                    <footer className="mt-12 py-6 text-center text-xs text-gray-400 border-t">
+                        <p>© 2025 天津中考查询系统 - API统计面板</p>
+                    </footer>
+                </div>
+            );
+        };
+        
+        // 渲染应用
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

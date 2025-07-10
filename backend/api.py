@@ -8,16 +8,18 @@ current_dir = Path(__file__).parent.absolute()
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional
+import time
 from rank_calculator import calculate_enhanced_rank, get_detailed_analysis
 from data import get_year_stats, get_score_distribution
 from school_recommender import recommend_schools_by_rank
 from api_auth import verify_api_key_with_delay, blur_rank_data, blur_score_data, should_blur_data, API_KEY_INFO
+from request_logger import request_logger
 
 app = FastAPI(
     title="天津中考位次查询API",
@@ -105,6 +107,36 @@ async def serve_recommend_app():
     else:
         raise HTTPException(status_code=404, detail="推荐页面文件未找到")
 
+@app.get("/admin/stats", 
+         summary="统计页面",
+         description="查看API请求统计和日志",
+         tags=["管理页面"])
+async def serve_stats_page():
+    """提供统计页面"""
+    html_file = FRONTEND_PATH / "stats.html"
+    if html_file.exists():
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    else:
+        raise HTTPException(status_code=404, detail="统计页面文件未找到")
+
+@app.get("/api/stats",
+         summary="获取统计数据",
+         description="获取API请求统计和日志数据",
+         tags=["API"])
+async def get_request_stats():
+    """获取请求统计数据"""
+    try:
+        stats = request_logger.get_stats()
+        return JSONResponse(content=stats)
+    except Exception as e:
+        print(f"获取统计数据失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取统计数据失败：{str(e)}"
+        )
+
 @app.get("/api-info")
 async def api_info():
     """API信息（原来的根路由）"""
@@ -125,6 +157,7 @@ async def api_info():
 
 @app.post("/rank", response_model=RankResponse)
 async def query_rank(
+    request: Request,
     query: ScoreQuery,
     api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
@@ -134,12 +167,34 @@ async def query_rank(
     - **score**: 中考分数（0-800分，支持0.1分精度）
     - **X-API-Key**: API密钥（通过请求头传递）
     """
+    start_time = time.time()
     print(f"🔍 [DEBUG] 收到查询请求: score={query.score}")
     
+    # 获取客户端信息
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
     # 验证API密钥
+    status_code = 200
+    error_msg = None
+    
     try:
         is_valid = await verify_api_key_with_delay(api_key)
-    except HTTPException:
+    except HTTPException as e:
+        status_code = e.status_code
+        error_msg = e.detail
+        # 记录请求日志
+        request_logger.log_request(
+            endpoint="/rank",
+            api_key=api_key,
+            is_valid_key=False,
+            status_code=status_code,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"score": query.score},
+            error=error_msg
+        )
         raise
     except Exception as e:
         print(f"❌ [AUTH] 密钥验证异常: {str(e)}")
@@ -185,6 +240,18 @@ async def query_rank(
         
         # 无论是否有有效密钥，都返回真实数据
         # （延迟和错误已经在 verify_api_key_with_delay 中处理）
+        # 记录请求日志
+        request_logger.log_request(
+            endpoint="/rank",
+            api_key=api_key,
+            is_valid_key=is_valid,
+            status_code=status_code,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"score": query.score}
+        )
+        
         return RankResponse(
             score=query.score,
             rank=rank_result['rank'],
@@ -203,6 +270,20 @@ async def query_rank(
         print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")
         import traceback
         print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
+        
+        # 记录错误请求
+        request_logger.log_request(
+            endpoint="/rank",
+            api_key=api_key,
+            is_valid_key=is_valid if 'is_valid' in locals() else False,
+            status_code=500,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"score": query.score},
+            error=str(e)
+        )
+        
         raise HTTPException(
             status_code=500,
             detail=f"查询失败：{str(e)}"
@@ -258,6 +339,7 @@ class RecommendationResponse(BaseModel):
 
 @app.post("/recommend", response_model=RecommendationResponse)
 async def get_recommendations(
+    request: Request,
     query: RecommendationQuery,
     api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
@@ -267,12 +349,34 @@ async def get_recommendations(
     - **rank**: 市六区位次（1-40000）
     - **X-API-Key**: API密钥（通过请求头传递）
     """
+    start_time = time.time()
     print(f"🔍 [DEBUG] 收到推荐请求: rank={query.rank}")
     
+    # 获取客户端信息
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
     # 验证API密钥
+    status_code = 200
+    error_msg = None
+    
     try:
         is_valid = await verify_api_key_with_delay(api_key)
-    except HTTPException:
+    except HTTPException as e:
+        status_code = e.status_code
+        error_msg = e.detail
+        # 记录请求日志
+        request_logger.log_request(
+            endpoint="/recommend",
+            api_key=api_key,
+            is_valid_key=False,
+            status_code=status_code,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"rank": query.rank},
+            error=error_msg
+        )
         raise
     except Exception as e:
         print(f"❌ [AUTH] 密钥验证异常: {str(e)}")
@@ -290,6 +394,18 @@ async def get_recommendations(
         # 无论是否有有效密钥，都返回真实数据
         # （延迟和错误已经在 verify_api_key_with_delay 中处理）
         
+        # 记录请求日志
+        request_logger.log_request(
+            endpoint="/recommend",
+            api_key=api_key,
+            is_valid_key=is_valid,
+            status_code=status_code,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"rank": query.rank}
+        )
+        
         return RecommendationResponse(
             rank=query.rank,
             recommendations=recommendations,
@@ -300,6 +416,20 @@ async def get_recommendations(
         print(f"❌ [DEBUG] 推荐失败: {str(e)}")
         import traceback
         print(f"❌ [DEBUG] 错误堆栈: {traceback.format_exc()}")
+        
+        # 记录错误请求
+        request_logger.log_request(
+            endpoint="/recommend",
+            api_key=api_key,
+            is_valid_key=is_valid if 'is_valid' in locals() else False,
+            status_code=500,
+            response_time=time.time() - start_time,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            request_data={"rank": query.rank},
+            error=str(e)
+        )
+        
         raise HTTPException(
             status_code=500,
             detail=f"推荐失败：{str(e)}"

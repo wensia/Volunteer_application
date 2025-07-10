@@ -1,0 +1,45 @@
+{
+  "requests": [
+    {
+      "timestamp": "2025-07-10T11:24:24.115308",
+      "endpoint": "/rank",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 2.09,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "score": 760.1
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T11:24:25.899292",
+      "endpoint": "/recommend",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 3.11,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "rank": 2487
+      },
+      "error": null
+    }
+  ],
+  "key_stats": {
+    "TJ-EDU-202...": {
+      "first_seen": "2025-07-10T11:24:24.115353",
+      "total_requests": 2,
+      "successful_requests": 2,
+      "failed_requests": 0,
+      "endpoints": {
+        "/rank": 1,
+        "/recommend": 1
+      },
+      "last_seen": "2025-07-10T11:24:25.899303"
+    }
+  }
+}

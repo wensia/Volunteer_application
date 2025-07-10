@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
         /* 移动端优化样式 */
@@ -159,6 +160,40 @@
             background-color: rgb(220 252 231);
             color: rgb(22 163 74);
         }
+        
+        /* 浮动按钮样式 */
+        .floating-button {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: rgb(15 23 42);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .floating-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.35);
+        }
+        
+        .floating-button:active {
+            transform: scale(0.95);
+        }
+        
+        .floating-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased">
@@ -172,6 +207,20 @@
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('api_key') || '';
         };
+        
+        // 复制图标组件
+        const CopyIcon = () => (
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+        );
+        
+        // 勾号图标组件（用于复制成功）
+        const CheckMarkIcon = () => (
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+        );
 
         // Loading 图标组件
         const LoadingIcon = () => (
@@ -257,7 +306,10 @@
             const [error, setError] = useState('');
             const [result, setResult] = useState(null);
             const [apiKey, setApiKey] = useState('');
+            const [copying, setCopying] = useState(false);
+            const [copySuccess, setCopySuccess] = useState(false);
             const inputRef = useRef(null);
+            const resultsRef = useRef(null);
             
             // 初始化
             useEffect(() => {
@@ -322,6 +374,66 @@
                 } finally {
                     setLoading(false);
                 }
+            };
+            
+            // 处理复制图片
+            const handleCopyImage = async () => {
+                if (!resultsRef.current || copying) return;
+                
+                setCopying(true);
+                setCopySuccess(false);
+                
+                try {
+                    // 滚动到顶部以确保截取完整内容
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    await new Promise(resolve => setTimeout(resolve, 500)); // 等待滚动完成
+                    
+                    // 使用html2canvas截取元素
+                    const canvas = await html2canvas(resultsRef.current, {
+                        backgroundColor: '#ffffff',
+                        scale: 2, // 高清度
+                        logging: false,
+                        useCORS: true,
+                        windowWidth: resultsRef.current.scrollWidth,
+                        windowHeight: resultsRef.current.scrollHeight
+                    });
+                    
+                    // 尝试使用Clipboard API复制图片
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        canvas.toBlob(async (blob) => {
+                            try {
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({
+                                        'image/png': blob
+                                    })
+                                ]);
+                                setCopySuccess(true);
+                                setTimeout(() => setCopySuccess(false), 2000);
+                            } catch (err) {
+                                console.error('复制失败:', err);
+                                // 如果复制失败，提供下载选项
+                                downloadImage(canvas);
+                            }
+                            setCopying(false);
+                        }, 'image/png');
+                    } else {
+                        // 浏览器不支持Clipboard API，直接下载
+                        downloadImage(canvas);
+                        setCopying(false);
+                    }
+                } catch (error) {
+                    console.error('截图失败:', error);
+                    setCopying(false);
+                    alert('截图失败，请重试');
+                }
+            };
+            
+            // 下载图片
+            const downloadImage = (canvas) => {
+                const link = document.createElement('a');
+                link.download = `志愿推荐结果_位次${result.rank}_${new Date().toLocaleString('zh-CN', {dateStyle: 'short', timeStyle: 'short'}).replace(/[:\/]/g, '-')}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
             };
 
             return (
@@ -429,7 +541,7 @@
 
                         {/* 推荐结果 */}
                         {result && (
-                            <div className="space-y-8">
+                            <div className="space-y-8" ref={resultsRef}>
                                 <div className="text-center">
                                     <h2 className="text-2xl font-bold">志愿推荐结果</h2>
                                     <p className="text-slate-600 mt-2">
@@ -507,6 +619,24 @@
                     <footer className="mt-12 py-6 text-center text-xs text-slate-400 border-t">
                         <p>© 2025 天津中考志愿推荐系统 | 推荐结果仅供参考</p>
                     </footer>
+                    
+                    {/* 浮动复制按钮 */}
+                    {result && (
+                        <button
+                            onClick={handleCopyImage}
+                            disabled={copying}
+                            className="floating-button"
+                            title="复制推荐结果图片"
+                        >
+                            {copying ? (
+                                <LoadingIcon />
+                            ) : copySuccess ? (
+                                <CheckMarkIcon />
+                            ) : (
+                                <CopyIcon />
+                            )}
+                        </button>
+                    )}
                 </div>
             );
         };

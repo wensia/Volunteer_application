@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <!-- API兼容性修复代码 - 内联版本 -->
     <script>
@@ -477,6 +478,169 @@
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('api_key') || '';
         };
+        
+        // 复制图标组件
+        const CopyIcon = () => (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+        );
+        
+        // 下载图标组件
+        const DownloadIcon = () => (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        );
+        
+        // 关闭图标组件
+        const CloseIcon = () => (
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        );
+        
+        // 学校图标组件
+        const SchoolIcon = () => (
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+            </svg>
+        );
+        
+        // 推荐学校卡片组件
+        const RecommendSchoolCard = ({ school, category }) => {
+            const categoryColors = {
+                '冲': 'bg-red-50 text-red-700 border-red-200',
+                '稳': 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                '保': 'bg-green-50 text-green-700 border-green-200'
+            };
+            
+            return (
+                <div className="p-3 border rounded-lg hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <SchoolIcon />
+                            <h4 className="font-medium">{school['学校名称']}</h4>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${categoryColors[category]}`}>
+                            {category}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+                        <div>
+                            <span className="text-slate-500">区域：</span>
+                            <span>{school['区域']}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500">招生：</span>
+                            <span>{school['招生人数']}人</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500">分数线：</span>
+                            <span>{school['2024年录取分数线']}分</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500">位次：</span>
+                            <span>第{school['2024年录取位次'].toLocaleString()}名</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // 推荐弹窗组件
+        const RecommendModal = ({ isOpen, onClose, rank, recommendations, loading }) => {
+            if (!isOpen) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
+                    <div 
+                        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold">
+                                市六区位次 第{rank?.toLocaleString()}名 的志愿推荐
+                            </h3>
+                            <button 
+                                onClick={onClose} 
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <CloseIcon />
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+                            {loading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <LoadingIcon />
+                                    <span className="ml-2">正在获取推荐结果...</span>
+                                </div>
+                            ) : recommendations ? (
+                                <div className="space-y-6">
+                                    {/* 冲档学校 */}
+                                    {recommendations['冲'] && recommendations['冲'].length > 0 && (
+                                        <div>
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-sm">冲一冲</span>
+                                                <span className="text-sm text-slate-600">({recommendations['冲'].length}所)</span>
+                                            </h4>
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {recommendations['冲'].map((school, index) => (
+                                                    <RecommendSchoolCard key={index} school={school} category="冲" />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* 稳档学校 */}
+                                    {recommendations['稳'] && recommendations['稳'].length > 0 && (
+                                        <div>
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-sm">稳一稳</span>
+                                                <span className="text-sm text-slate-600">({recommendations['稳'].length}所)</span>
+                                            </h4>
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {recommendations['稳'].map((school, index) => (
+                                                    <RecommendSchoolCard key={index} school={school} category="稳" />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* 保档学校 */}
+                                    {recommendations['保'] && recommendations['保'].length > 0 && (
+                                        <div>
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-sm">保一保</span>
+                                                <span className="text-sm text-slate-600">({recommendations['保'].length}所)</span>
+                                            </h4>
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {recommendations['保'].map((school, index) => (
+                                                    <RecommendSchoolCard key={index} school={school} category="保" />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-slate-500">
+                                    暂无推荐数据
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="p-4 border-t bg-slate-50">
+                            <p className="text-xs text-slate-500 text-center">
+                                推荐结果仅供参考，请结合实际情况填报志愿
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
 
         // Loading 图标组件
@@ -510,7 +674,13 @@
             const [result, setResult] = useState(null);
             const [stats, setStats] = useState(null);
             const [apiKey, setApiKey] = useState('');
+            const [copying, setCopying] = useState(false);
+            const [copySuccess, setCopySuccess] = useState(false);
+            const [showRecommendModal, setShowRecommendModal] = useState(false);
+            const [recommendations, setRecommendations] = useState(null);
+            const [recommendLoading, setRecommendLoading] = useState(false);
             const inputRef = useRef(null);
+            const resultRef = useRef(null);
 
             // 初始化
             useEffect(() => {
@@ -578,6 +748,92 @@
                     setLoading(false);
                 }
             };
+            
+            // 处理复制图片
+            const handleCopyImage = async () => {
+                if (!resultRef.current || copying) return;
+                
+                setCopying(true);
+                setCopySuccess(false);
+                
+                try {
+                    // 使用html2canvas截取元素
+                    const canvas = await html2canvas(resultRef.current, {
+                        backgroundColor: '#f8fafc',
+                        scale: 2, // 高清度
+                        logging: false,
+                        useCORS: true
+                    });
+                    
+                    // 尝试使用Clipboard API复制图片
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        canvas.toBlob(async (blob) => {
+                            try {
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({
+                                        'image/png': blob
+                                    })
+                                ]);
+                                setCopySuccess(true);
+                                setTimeout(() => setCopySuccess(false), 2000);
+                            } catch (err) {
+                                console.error('复制失败:', err);
+                                // 如果复制失败，提供下载选项
+                                downloadImage(canvas);
+                            }
+                            setCopying(false);
+                        }, 'image/png');
+                    } else {
+                        // 浏览器不支持Clipboard API，直接下载
+                        downloadImage(canvas);
+                        setCopying(false);
+                    }
+                } catch (error) {
+                    console.error('截图失败:', error);
+                    setCopying(false);
+                    alert('截图失败，请重试');
+                }
+            };
+            
+            // 下载图片
+            const downloadImage = (canvas) => {
+                const link = document.createElement('a');
+                link.download = `中考位次查询结果_${result.score}分_${new Date().toLocaleString('zh-CN', {dateStyle: 'short', timeStyle: 'short'}).replace(/[:\/]/g, '-')}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            };
+            
+            // 获取冲稳保推荐
+            const handleGetRecommendations = async () => {
+                if (!result || !result.inner_rank) return;
+                
+                setShowRecommendModal(true);
+                setRecommendLoading(true);
+                setRecommendations(null);
+                
+                try {
+                    const response = await fetch('/recommend', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
+                        },
+                        body: JSON.stringify({ rank: result.inner_rank })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    setRecommendations(data.recommendations);
+                } catch (error) {
+                    console.error('获取推荐失败:', error);
+                    setRecommendations(null);
+                } finally {
+                    setRecommendLoading(false);
+                }
+            };
 
             return (
                 <div className="min-h-screen bg-white">
@@ -588,9 +844,12 @@
                                 <div className="flex items-center">
                                     <h1 className="text-xl font-semibold">天津中考位次查询（全市/市六区）</h1>
                                 </div>
-                                <div className="flex items-center">
+                                <div className="flex items-center gap-4">
                                     <a href="/recommend-app" className="text-sm text-blue-600 hover:text-blue-800">
                                         志愿推荐 →
+                                    </a>
+                                    <a href="/admin/stats" className="text-sm text-gray-600 hover:text-gray-800">
+                                        统计
                                     </a>
                                 </div>
                             </div>
@@ -660,7 +919,22 @@
                                     {/* 查询结果 */}
                                     {result && (
                                         <div className="mt-6 space-y-4">
-                                            <div className="rounded-lg bg-slate-50 p-4">
+                                            <div className="rounded-lg bg-slate-50 p-4 relative" ref={resultRef}>
+                                                {/* 复制按钮 */}
+                                                <button
+                                                    onClick={handleCopyImage}
+                                                    disabled={copying}
+                                                    className="absolute top-2 right-2 p-2 bg-white rounded-md shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+                                                    title="复制结果图片"
+                                                >
+                                                    {copying ? (
+                                                        <LoadingIcon />
+                                                    ) : copySuccess ? (
+                                                        <CheckIcon />
+                                                    ) : (
+                                                        <CopyIcon />
+                                                    )}
+                                                </button>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="bg-white rounded-md p-3 border border-slate-200">
                                                         <p className="text-xs font-medium text-slate-500">您的分数</p>
@@ -671,9 +945,14 @@
                                                         <p className="text-lg font-semibold mt-1">全市 {result.percentage}%</p>
                                                         <p className="text-xs text-slate-500 mt-0.5">市六区 {result.inner_percentage}%</p>
                                                     </div>
-                                                    <div className="bg-white rounded-md p-3 border border-slate-200">
+                                                    <div 
+                                                        className="bg-white rounded-md p-3 border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors"
+                                                        onClick={handleGetRecommendations}
+                                                        title="点击查看冲稳保推荐"
+                                                    >
                                                         <p className="text-xs font-medium text-slate-500">市六区位次</p>
                                                         <p className="text-lg font-semibold mt-1">约为第 {result.inner_rank.toLocaleString()} 名</p>
+                                                        <p className="text-xs text-blue-600 mt-1">点击查看冲稳保 ></p>
                                                     </div>
                                                     <div className="bg-white rounded-md p-3 border border-slate-200">
                                                         <p className="text-xs font-medium text-slate-500">全市位次</p>
@@ -728,6 +1007,15 @@
                     <footer className="mt-12 py-6 text-center text-xs text-slate-400 border-t">
                         <p>© 2025 天津中考位次查询系统 | 数据仅供参考</p>
                     </footer>
+                    
+                    {/* 冲稳保推荐弹窗 */}
+                    <RecommendModal
+                        isOpen={showRecommendModal}
+                        onClose={() => setShowRecommendModal(false)}
+                        rank={result?.inner_rank}
+                        recommendations={recommendations}
+                        loading={recommendLoading}
+                    />
                 </div>
             );
         };
