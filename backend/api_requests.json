@@ -27,19 +27,131 @@
         "rank": 2487
       },
       "error": null
+    },
+    {
+      "timestamp": "2025-07-10T13:44:30.792685",
+      "endpoint": "/rank",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 12.48,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "score": 760.1
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T13:44:32.401001",
+      "endpoint": "/recommend",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 3.7,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "rank": 2487
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:42:17.800464",
+      "endpoint": "/rank",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 1.87,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "score": 760.0
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:42:19.241998",
+      "endpoint": "/recommend",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 2.71,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "rank": 2509
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:42:28.073282",
+      "endpoint": "/rank",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 2.23,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "score": 725.4
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:42:29.582093",
+      "endpoint": "/recommend",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 0.98,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "rank": 10914
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:44:59.895928",
+      "endpoint": "/rank",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 0.79,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "score": 725.41
+      },
+      "error": null
+    },
+    {
+      "timestamp": "2025-07-10T16:45:05.941107",
+      "endpoint": "/recommend",
+      "api_key": "TJ-EDU-202...",
+      "is_valid_key": true,
+      "status_code": 200,
+      "response_time_ms": 0.87,
+      "client_ip": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+      "request_data": {
+        "rank": 10911
+      },
+      "error": null
     }
   ],
   "key_stats": {
     "TJ-EDU-202...": {
       "first_seen": "2025-07-10T11:24:24.115353",
-      "total_requests": 2,
-      "successful_requests": 2,
+      "total_requests": 10,
+      "successful_requests": 10,
       "failed_requests": 0,
       "endpoints": {
-        "/rank": 1,
-        "/recommend": 1
+        "/rank": 5,
+        "/recommend": 5
       },
-      "last_seen": "2025-07-10T11:24:25.899303"
+      "last_seen": "2025-07-10T16:45:05.941151"
     }
   }
 }

@@ -551,18 +551,18 @@
         };
         
         // 推荐弹窗组件
-        const RecommendModal = ({ isOpen, onClose, rank, recommendations, loading }) => {
+        const RecommendModal = ({ isOpen, onClose, rank, score, recommendations, loading }) => {
             if (!isOpen) return null;
             
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
                     <div 
-                        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+                        className="bg-white rounded-lg max-w-4xl w-full h-[90vh] overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between p-4 border-b">
                             <h3 className="text-lg font-semibold">
-                                市六区位次 第{rank?.toLocaleString()}名 的志愿推荐
+                                <span className="text-blue-600">{score}分</span> - 市六区第 <span className="text-orange-600">{rank?.toLocaleString()}</span> 名的志愿推荐
                             </h3>
                             <button 
                                 onClick={onClose} 
@@ -572,7 +572,7 @@
                             </button>
                         </div>
                         
-                        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+                        <div className="p-4 overflow-y-auto" style={{ height: 'calc(90vh - 120px)' }}>
                             {loading ? (
                                 <div className="flex items-center justify-center py-12">
                                     <LoadingIcon />
@@ -1013,6 +1013,7 @@
                         isOpen={showRecommendModal}
                         onClose={() => setShowRecommendModal(false)}
                         rank={result?.inner_rank}
+                        score={result?.score}
                         recommendations={recommendations}
                         loading={recommendLoading}
                     />
