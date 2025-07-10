@@ -502,7 +502,7 @@
         
         // 学校图标组件
         const SchoolIcon = () => (
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path d="M12 14l9-5-9-5-9 5 9 5z" />
                 <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
@@ -518,17 +518,17 @@
             };
             
             return (
-                <div className="p-3 border rounded-lg hover:shadow-sm transition-shadow">
+                <div className="p-2.5 border rounded-lg hover:shadow-sm transition-shadow">
                     <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <SchoolIcon />
-                            <h4 className="font-medium">{school['学校名称']}</h4>
+                            <h4 className="font-medium text-sm">{school['学校名称']}</h4>
                         </div>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${categoryColors[category]}`}>
                             {category}
                         </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+                    <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600">
                         <div>
                             <span className="text-slate-500">区域：</span>
                             <span>{school['区域']}</span>
@@ -551,43 +551,67 @@
         };
         
         // 推荐弹窗组件
-        const RecommendModal = ({ isOpen, onClose, rank, score, recommendations, loading }) => {
+        const RecommendModal = ({ isOpen, onClose, rank, score, result, recommendations, loading }) => {
             if (!isOpen) return null;
             
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
                     <div 
-                        className="bg-white rounded-lg max-w-4xl w-full h-[90vh] overflow-hidden"
+                        className="bg-white rounded-lg max-w-6xl w-full h-[90vh] flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="text-lg font-semibold">
-                                <span className="text-blue-600">{score}分</span> - 市六区第 <span className="text-orange-600">{rank?.toLocaleString()}</span> 名的志愿推荐
-                            </h3>
-                            <button 
-                                onClick={onClose} 
-                                className="text-slate-400 hover:text-slate-600"
-                            >
-                                <CloseIcon />
-                            </button>
+                        <div className="relative border-b flex-shrink-0">
+                            <div className="p-2">
+                                <div className="text-center">
+                                    <div className="text-base font-semibold">
+                                        <div>分数：<span className="text-blue-600">{score}分</span></div>
+                                        <div>位次：市六区第 <span className="text-orange-600">{rank?.toLocaleString()}</span> 名</div>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={onClose} 
+                                    className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <CloseIcon />
+                                </button>
+                            </div>
+                            {/* 彩色数据卡片 */}
+                            <div className="grid grid-cols-4 gap-2 p-2 bg-slate-50">
+                                <div className="bg-blue-50 rounded p-2 text-center border border-blue-200">
+                                    <p className="text-xs text-blue-600">您的分数</p>
+                                    <p className="text-sm font-bold text-blue-800">{score} 分</p>
+                                </div>
+                                <div className="bg-green-50 rounded p-2 text-center border border-green-200">
+                                    <p className="text-xs text-green-600">超过全市</p>
+                                    <p className="text-sm font-bold text-green-800">{result?.percentage || '--'}%</p>
+                                </div>
+                                <div className="bg-purple-50 rounded p-2 text-center border border-purple-200">
+                                    <p className="text-xs text-purple-600">超过市六区</p>
+                                    <p className="text-sm font-bold text-purple-800">{result?.inner_percentage || '--'}%</p>
+                                </div>
+                                <div className="bg-orange-50 rounded p-2 text-center border border-orange-200">
+                                    <p className="text-xs text-orange-600">全市位次</p>
+                                    <p className="text-sm font-bold text-orange-800">第{result?.rank?.toLocaleString() || '--'}名</p>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div className="p-4 overflow-y-auto" style={{ height: 'calc(90vh - 120px)' }}>
+                        <div className="flex-1 p-3 overflow-y-auto">
                             {loading ? (
                                 <div className="flex items-center justify-center py-12">
                                     <LoadingIcon />
                                     <span className="ml-2">正在获取推荐结果...</span>
                                 </div>
                             ) : recommendations ? (
-                                <div className="space-y-6">
+                                <div className="space-y-3">
                                     {/* 冲档学校 */}
                                     {recommendations['冲'] && recommendations['冲'].length > 0 && (
                                         <div>
-                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                            <h4 className="font-medium mb-2 flex items-center gap-2">
                                                 <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-sm">冲一冲</span>
                                                 <span className="text-sm text-slate-600">({recommendations['冲'].length}所)</span>
                                             </h4>
-                                            <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="grid gap-2 grid-cols-3">
                                                 {recommendations['冲'].map((school, index) => (
                                                     <RecommendSchoolCard key={index} school={school} category="冲" />
                                                 ))}
@@ -598,11 +622,11 @@
                                     {/* 稳档学校 */}
                                     {recommendations['稳'] && recommendations['稳'].length > 0 && (
                                         <div>
-                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                            <h4 className="font-medium mb-2 flex items-center gap-2">
                                                 <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-sm">稳一稳</span>
                                                 <span className="text-sm text-slate-600">({recommendations['稳'].length}所)</span>
                                             </h4>
-                                            <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="grid gap-2 grid-cols-3">
                                                 {recommendations['稳'].map((school, index) => (
                                                     <RecommendSchoolCard key={index} school={school} category="稳" />
                                                 ))}
@@ -613,11 +637,11 @@
                                     {/* 保档学校 */}
                                     {recommendations['保'] && recommendations['保'].length > 0 && (
                                         <div>
-                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                            <h4 className="font-medium mb-2 flex items-center gap-2">
                                                 <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-sm">保一保</span>
                                                 <span className="text-sm text-slate-600">({recommendations['保'].length}所)</span>
                                             </h4>
-                                            <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="grid gap-2 grid-cols-3">
                                                 {recommendations['保'].map((school, index) => (
                                                     <RecommendSchoolCard key={index} school={school} category="保" />
                                                 ))}
@@ -632,7 +656,7 @@
                             )}
                         </div>
                         
-                        <div className="p-4 border-t bg-slate-50">
+                        <div className="p-2 border-t bg-slate-50 flex-shrink-0">
                             <p className="text-xs text-slate-500 text-center">
                                 推荐结果仅供参考，请结合实际情况填报志愿
                             </p>
@@ -1014,6 +1038,7 @@
                         onClose={() => setShowRecommendModal(false)}
                         rank={result?.inner_rank}
                         score={result?.score}
+                        result={result}
                         recommendations={recommendations}
                         loading={recommendLoading}
                     />
