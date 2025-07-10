@@ -564,8 +564,7 @@
                             <div className="p-2">
                                 <div className="text-center">
                                     <div className="text-base font-semibold">
-                                        <div>分数：<span className="text-blue-600">{score}分</span></div>
-                                        <div>位次：市六区第 <span className="text-orange-600">{rank?.toLocaleString()}</span> 名</div>
+                                        志愿推荐
                                     </div>
                                 </div>
                                 <button 
@@ -576,22 +575,18 @@
                                 </button>
                             </div>
                             {/* 彩色数据卡片 */}
-                            <div className="grid grid-cols-4 gap-2 p-2 bg-slate-50">
+                            <div className="grid grid-cols-3 gap-2 p-2 bg-slate-50">
                                 <div className="bg-blue-50 rounded p-2 text-center border border-blue-200">
-                                    <p className="text-xs text-blue-600">您的分数</p>
+                                    <p className="text-xs text-blue-600">分数</p>
                                     <p className="text-sm font-bold text-blue-800">{score} 分</p>
                                 </div>
-                                <div className="bg-green-50 rounded p-2 text-center border border-green-200">
-                                    <p className="text-xs text-green-600">超过全市</p>
-                                    <p className="text-sm font-bold text-green-800">{result?.percentage || '--'}%</p>
-                                </div>
                                 <div className="bg-purple-50 rounded p-2 text-center border border-purple-200">
-                                    <p className="text-xs text-purple-600">超过市六区</p>
-                                    <p className="text-sm font-bold text-purple-800">{result?.inner_percentage || '--'}%</p>
+                                    <p className="text-xs text-purple-600">市六区位次</p>
+                                    <p className="text-sm font-bold text-purple-800">约为第{rank?.toLocaleString() || '--'}名</p>
                                 </div>
                                 <div className="bg-orange-50 rounded p-2 text-center border border-orange-200">
                                     <p className="text-xs text-orange-600">全市位次</p>
-                                    <p className="text-sm font-bold text-orange-800">第{result?.rank?.toLocaleString() || '--'}名</p>
+                                    <p className="text-sm font-bold text-orange-800">约为第{result?.rank?.toLocaleString() || '--'}名</p>
                                 </div>
                             </div>
                         </div>
